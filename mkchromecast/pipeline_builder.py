@@ -235,15 +235,20 @@ class VideoSettings:
     youtube_url: Optional[str]
 
 
+# Characters that mean something to ffmpeg while it parses a filtergraph, and
+# so have to be escaped inside a filter argument such as a subtitle path.
+_FILTER_SPECIAL_CHARS = frozenset("\\'\",:;[]=")
+
+
 class Video:
     # Differences compared to original policies:
     # - Using `veryfast` preset across the board, instead of `ultrafast`.
     # - Differences in vencode policy (see function).
     # - Avoids running ffmpeg with panic loglevel when --debug specified.
     #
-    # Note that this implementation remains broken (as was the original) in that
-    # "-vf" can only be specified once per stream, but will end up being
-    # specified twice if both subtitles and resolution are used.
+    # "-vf" can only be given once per stream: subtitles and resolution used to
+    # produce one each, and ffmpeg silently kept the last.  They are now
+    # collected into a single filter chain (see _input_file_command).
 
     def __init__(self, video_settings: VideoSettings):
         self._settings = video_settings
@@ -306,25 +311,47 @@ class Video:
         ]
 
     @staticmethod
+    def _escape_filter_path(path: str) -> str:
+        """Escapes a path so it survives being read as a filter argument.
+
+        The path travels through three parsers before libass sees it: the
+        filtergraph description, the filter's own argument list, and the
+        subtitles option itself.  Each one consumes a level of escaping, so a
+        character that is special to any of them needs three backslashes to
+        arrive intact -- verified against ffmpeg with names containing commas,
+        colons, brackets, quotes and backslashes.
+        """
+        return "".join(
+            "\\\\\\" + char if char in _FILTER_SPECIAL_CHARS else char
+            for char in path
+        )
+
+    @staticmethod
     def _input_file_subtitle(
         subtitles: Optional[str],
-        is_mkv: bool) -> tuple[list[str], list[str]]:
+        is_mkv: bool) -> tuple[list[str], list[str], list[str]]:
         """Returns input_file arguments related to subtitles.
 
         Depending on the pipeline settings, this will return arguments to be
-        specified alongside the input streams, and/or arguments to be specified
-        near the output settings.
+        specified alongside the input streams, arguments to be specified near
+        the output settings, and/or video filters.
+
+        Filters are returned on their own rather than as a ready-made "-vf"
+        pair because resolution produces one too, and the two have to end up in
+        a single "-vf".
 
         Returns:
-            A tuple of (input-adjacent args, output-adjacent args).
+            A tuple of (input-adjacent args, output-adjacent args, filters).
         """
         if not subtitles:
-            return ([], [],)
+            return ([], [], [],)
 
         if not is_mkv:
-            # Only output-adjacent args for non-mkv input files.
-            output_args = ["-vf", f"subtitles={subtitles}"]
-            return ([], output_args,)
+            # Burning subtitles in is a filter, so it is the caller's job to
+            # merge it with any other filter.
+            filters = [f"subtitles=filename="
+                       f"{Video._escape_filter_path(subtitles)}"]
+            return ([], [], filters,)
 
         print(colors.warning("Subtitles with mkv are not supported yet."))
         # NOTE(xsdg):  Here's an excerpt from the original command:
@@ -349,17 +376,22 @@ class Video:
                       "-codec:s", "mov_text",
                       "-map", "1:0"]
         output_args = ["-max_muxing_queue_size", "9999"]
-        return (input_args, output_args,)
+        return (input_args, output_args, [],)
 
     @staticmethod
-    def _input_file_vencode(input_file: str, res: Optional[str]) -> list[str]:
+    def _input_file_vencode(input_file: str, has_filters: bool) -> list[str]:
         """Specifies the video encoding args according to a simple policy.
 
-        1) If any reencoding is being done (for instance, to rescale), use
-           libx264 vcodec with yuv420p pixel format
+        1) If any reencoding is being done (for instance, to rescale or to burn
+           subtitles in), use libx264 vcodec with yuv420p pixel format
         2) If input pixel format is yuv420p10le (HDR), re-encode using libx264
            with yuv420p pixel format.
         3) Otherwise, copy input with no re-encoding.
+
+        Args:
+            has_filters: whether a video filter will be applied.  ffmpeg refuses
+                to run a filtergraph alongside a stream copy, so any filter at
+                all forces the re-encode strategy.
         """
 
         # Original policy was _extremely_ inconsistent and wasn't worth
@@ -378,8 +410,9 @@ class Video:
             "-g", "60"
         ]
 
-        if res:
-            # Rescaling always requires re-encoding.
+        if has_filters:
+            # Filtering and stream copy cannot be combined, so anything that
+            # rescales or burns subtitles in requires re-encoding.
             # TODO(xsdg): Optimization: if the input resolution already matches
             # the output resolution, avoid re-encoding?
             return reencode_strategy
@@ -440,20 +473,22 @@ class Video:
         maybe_seek_cmd: list[str] = (
             ["-ss", self._settings.seek] if self._settings.seek else [])
 
-        maybe_resolution_cmd: list[str]
+        # Scaling comes before subtitles so that they are rendered at the
+        # output resolution instead of being scaled along with the picture.
+        video_filters: list[str] = []
         if self._settings.resolution:
-            maybe_resolution_cmd = [
-                "-vf",
-                resolution.resolutions[self._settings.resolution][0]
-            ]
-        else:
-            maybe_resolution_cmd = []
+            video_filters.append(
+                resolution.resolutions[self._settings.resolution][0])
 
-        maybe_input_subtitle_cmd, maybe_filter_subtitle_cmd = (
+        maybe_input_subtitle_cmd, maybe_output_subtitle_cmd, subtitle_filters = (
             self._input_file_subtitle(self._settings.subtitles, input_is_mkv))
+        video_filters.extend(subtitle_filters)
+
+        maybe_filter_cmd: list[str] = (
+            ["-vf", ",".join(video_filters)] if video_filters else [])
 
         vencode_cmd = self._input_file_vencode(self._settings.input_file,
-                                               self._settings.resolution)
+                                               bool(video_filters))
 
         aencode_cmd = self._input_file_aencode(bool(self._settings.subtitles),
                                                input_is_mkv)
@@ -470,7 +505,7 @@ class Video:
             *aencode_cmd,
             "-f", "mp4",
             "-movflags", "frag_keyframe+empty_moov",
-            *maybe_filter_subtitle_cmd,
-            *maybe_resolution_cmd,
+            *maybe_output_subtitle_cmd,
+            *maybe_filter_cmd,
             "pipe:1",
         ]

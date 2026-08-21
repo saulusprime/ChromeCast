@@ -252,7 +252,7 @@ class VideoBuilderTests(unittest.TestCase):
         return pipeline_builder.Video(settings)
 
     def testEmptySubtitleCommands(self):
-        empty_sub = ([], [],)
+        empty_sub = ([], [], [],)
         self.assertEqual(
             empty_sub,
             pipeline_builder.Video._input_file_subtitle(None, is_mkv=False)
@@ -264,9 +264,8 @@ class VideoBuilderTests(unittest.TestCase):
 
     def testMkvSubtitleCommands(self):
         sub_file = "subtitles.srt"
-        input_args, output_args = pipeline_builder.Video._input_file_subtitle(
-            sub_file, is_mkv=True
-        )
+        input_args, output_args, filters = (
+            pipeline_builder.Video._input_file_subtitle(sub_file, is_mkv=True))
 
         self.assertIn("-i", input_args)
         i_index = input_args.index("-i")
@@ -274,18 +273,28 @@ class VideoBuilderTests(unittest.TestCase):
 
         self.assertIn("-max_muxing_queue_size", output_args)
         self.assertNotIn("-vf", output_args)
+        self.assertEqual([], filters)
 
     def testNonMkvSubtitleCommands(self):
         sub_file = "subtitles.srt"
-        input_args, output_args = pipeline_builder.Video._input_file_subtitle(
-            sub_file, is_mkv=False
-        )
+        input_args, output_args, filters = (
+            pipeline_builder.Video._input_file_subtitle(sub_file, is_mkv=False))
 
         self.assertEqual([], input_args)
+        self.assertEqual([], output_args)
+        self.assertEqual([f"subtitles=filename={sub_file}"], filters)
 
-        self.assertIn("-vf", output_args)
-        o_index = output_args.index("-vf")
-        self.assertEqual(f"subtitles={sub_file}", output_args[o_index + 1])
+    def testSubtitlePathIsEscapedForTheFilterGraph(self):
+        # A comma would otherwise end the subtitles filter and start a
+        # nonexistent one; verified against ffmpeg.
+        escape = pipeline_builder.Video._escape_filter_path
+
+        self.assertEqual("plain.srt", escape("plain.srt"))
+        self.assertEqual(r"we\\\,ird.srt", escape("we,ird.srt"))
+        self.assertEqual(r"a\\\:b\\\'c\\\[d\\\].srt",
+                         escape("a:b\'c[d].srt"))
+        self.assertEqual(r"back\\\\slash.srt",
+                         escape("back" + "\\" + "slash.srt"))
 
     def testAudioEncodeCommands(self):
         # Shorthand for convenience.
@@ -307,24 +316,25 @@ class VideoBuilderTests(unittest.TestCase):
         # Shorthand for convenience.
         vencode_fxn = pipeline_builder.Video._input_file_vencode
 
-        # Whenever resolution is specified, we should see the reencode strategy.
-        self.assertIn("libx264", vencode_fxn("input.mp4", res="1080p"))
-        self.assertIn("libx264", vencode_fxn("input.mkv", res="1080p"))
-        self.assertNotIn("copy", vencode_fxn("input.mkv", res="1080p"))
+        # Whenever a filter is applied, we should see the reencode strategy:
+        # ffmpeg refuses to filter and stream-copy at the same time.
+        self.assertIn("libx264", vencode_fxn("input.mp4", has_filters=True))
+        self.assertIn("libx264", vencode_fxn("input.mkv", has_filters=True))
+        self.assertNotIn("copy", vencode_fxn("input.mkv", has_filters=True))
 
-        # We should always copy for non-mkv without resolution specified.
-        self.assertIn("copy", vencode_fxn("input.mp4", res=None))
-        self.assertNotIn("libx264", vencode_fxn("input.mp4", res=None))
+        # We should always copy for non-mkv without filters.
+        self.assertIn("copy", vencode_fxn("input.mp4", has_filters=False))
+        self.assertNotIn("libx264", vencode_fxn("input.mp4", has_filters=False))
 
-        # For mkv without resolution, we should only reencode yuv420p10le.
+        # For mkv without filters, we should only reencode yuv420p10le.
         utils.check_file_info.side_effect = None
         utils.check_file_info.return_value = "yuv420p"
-        self.assertIn("copy", vencode_fxn("input.mkv", res=None))
+        self.assertIn("copy", vencode_fxn("input.mkv", has_filters=False))
         utils.check_file_info.assert_called_once()
 
         utils.check_file_info.reset_mock()
         utils.check_file_info.return_value = "yuv420p10le"
-        self.assertIn("libx264", vencode_fxn("input.mkv", res=None))
+        self.assertIn("libx264", vencode_fxn("input.mkv", has_filters=False))
         utils.check_file_info.assert_called_once()
 
     def testSpotCheckReencodeFullCommand(self):
@@ -350,6 +360,34 @@ class VideoBuilderTests(unittest.TestCase):
                                       input_file="input_file.mp4",
                                       resolution="1080p")
         self.assertEqual(exp_command, builder.command)
+
+    def testSubtitlesAndResolutionShareOneFilterChain(self):
+        # "-vf" can only be given once: with one each, ffmpeg kept the last and
+        # dropped the other without a word.
+        builder = self.create_builder(operation=OpMode.INPUT_FILE,
+                                      input_file="input_file.mp4",
+                                      resolution="1080p",
+                                      subtitles="subs.srt")
+        command = builder.command
+
+        self.assertEqual(1, command.count("-vf"))
+        self.assertEqual("scale=1920x1080,subtitles=filename=subs.srt",
+                         command[command.index("-vf") + 1])
+
+    def testSubtitlesAloneForceReencoding(self):
+        # ffmpeg cannot run a filtergraph next to "-vcodec copy", so burning
+        # subtitles in has to switch the copy strategy off.
+        builder = self.create_builder(operation=OpMode.INPUT_FILE,
+                                      input_file="input_file.mp4",
+                                      resolution=None,
+                                      subtitles="subs.srt")
+        command = builder.command
+
+        self.assertIn("-vf", command)
+        self.assertEqual("subtitles=filename=subs.srt",
+                         command[command.index("-vf") + 1])
+        self.assertNotIn("copy", command)
+        self.assertIn("libx264", command)
 
     def testSpotCheckCopyFullCommand(self):
         exp_command = [
