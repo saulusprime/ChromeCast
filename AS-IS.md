@@ -855,11 +855,20 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 ## Verifiche di regressione
 
 > **Attenzione a quale eseguibile si lancia.** `mkchromecast` sul PATH è
-> `/usr/bin/mkchromecast`, il pacchetto apt `0.3.9~git20200902+db2964a` del
-> 2020, che carica `/usr/lib/python3/dist-packages/mkchromecast/`: **non
-> contiene niente di quanto è documentato qui**. Le verifiche vanno fatte con
-> l'albero di lavoro, e con il python del venv (quello di sistema non ha
-> `pychromecast>=14` né `ifaddr`):
+> `/usr/bin/mkchromecast`, che appartiene a un pacchetto e **non** all'albero
+> di lavoro. Su questa macchina era il pacchetto apt `0.3.9~git20200902+db2964a`
+> del 2020, che non conteneva niente di quanto è documentato qui; dal 21 agosto
+> 2026 è stato sostituito dal pacchetto costruito con `make deb`
+> (`0.3.9-1local1`). Da controllare prima di fidarsi:
+>
+> ```bash
+> dpkg -l mkchromecast                                   # quale versione
+> cd /tmp && python3 -c "import mkchromecast.cast as c; print(c.__file__)"
+> ```
+>
+> In ogni caso le verifiche di una modifica non ancora impacchettata vanno
+> fatte sull'albero di lavoro, col python del venv (quello di sistema segue le
+> versioni della distribuzione, non `requirements.txt`):
 >
 > ```bash
 > MKC=".venv/bin/python bin/mkchromecast"
