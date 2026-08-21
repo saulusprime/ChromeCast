@@ -18,7 +18,6 @@ import shutil
 import time
 import re
 import sys
-import signal
 import subprocess
 
 import mkchromecast
@@ -28,6 +27,23 @@ from mkchromecast import constants
 from mkchromecast import utils
 from mkchromecast.cast import Casting
 from mkchromecast.constants import OpMode
+
+
+# How many times a dead node server is restarted before we stop trying.  The
+# original code restarted it by spawning a fresh copy of this very process,
+# which made every restart a new child of the previous one: a node that failed
+# on startup turned that into an unbounded chain of processes.  Restarting in
+# place, a bounded number of times, is what that path was meant to do.
+NODE_RECONNECT_ATTEMPTS = 3
+
+# Seconds given to a freshly started node server before we consider it up.
+NODE_RESTART_GRACE_SECONDS = 2.0
+
+# A server that stayed up this long counts as having worked: whatever kills it
+# afterwards is a new failure, not a continuation of the one we just recovered
+# from, so the attempt budget starts over.  Without this, a long tray session
+# would run out of attempts days apart and then stop reconnecting for good.
+NODE_HEALTHY_UPTIME_SECONDS = 60.0
 
 
 def streaming(mkcc: mkchromecast.Mkchromecast):
@@ -89,81 +105,117 @@ def streaming(mkcc: mkchromecast.Mkchromecast):
             "stream",
         ]
 
-    if webcast is not None:
+    if webcast is None:
+        return
+
+    with open("/tmp/mkchromecast.pid", "rb") as f:
+        pidnumber = int(pickle.load(f))
+    print(colors.options("PID of main process:") + " " + str(pidnumber))
+
+    localpid = os.getpid()
+    print(colors.options("PID of streaming process: ") + str(localpid))
+
+    attempt = 0
+    while attempt <= NODE_RECONNECT_ATTEMPTS:
+        if attempt:
+            print(colors.warning(
+                f"Reconnecting node streaming "
+                f"(attempt {attempt} of {NODE_RECONNECT_ATTEMPTS})..."))
+            notify_reconnecting(mkcc)
+            time.sleep(NODE_RESTART_GRACE_SECONDS * attempt)
+
+        started_at = time.monotonic()
         p = subprocess.Popen(webcast)
 
         if mkcc.debug is True:
             print(":::node::: node command: %s." % webcast)
 
-        f = open("/tmp/mkchromecast.pid", "rb")
-        pidnumber = int(pickle.load(f))
-        print(colors.options("PID of main process:") + " " + str(pidnumber))
+        if attempt:
+            # The device is still pointed at the server that just died, so it
+            # has to be told to read the new one -- but only once node has
+            # survived long enough to be listening.
+            time.sleep(NODE_RESTART_GRACE_SECONDS)
+            if p.poll() is None:
+                recasting()
 
-        localpid = os.getpid()
-        print(colors.options("PID of streaming process: ") + str(localpid))
+        watch_until_exit(p, pidnumber, localpid)
 
-        while p.poll() is None:
-            try:
-                time.sleep(0.5)
-                # With this I ensure that if the main app fails, everything
-                # will get back to normal
-                if psutil.pid_exists(pidnumber) is False:
-                    inputint()
-                    outputint()
-                    parent = psutil.Process(localpid)
-                    # or parent.children() for recursive=False
-                    for child in parent.children(recursive=True):
-                        child.kill()
-                    parent.kill()
-            except KeyboardInterrupt:
-                print("Ctrl-c was requested")
-                sys.exit(0)
-            except IOError:
-                print("I/O Error")
-                sys.exit(0)
-            except OSError:
-                print("OSError")
-                sys.exit(0)
-        else:
-            print(colors.warning("Reconnecting node streaming..."))
-            if mkcc.platform == "Darwin" and mkcc.notifications:
-                if os.path.exists("images/google.icns") is True:
-                    noticon = "images/google.icns"
-                else:
-                    noticon = "google.icns"
-            if mkcc.debug is True:
-                print(
-                    ":::node::: platform, tray, notifications: %s, %s, %s."
-                    % (mkcc.platform, mkcc.tray, mkcc.notifications)
-                )
+        if time.monotonic() - started_at >= NODE_HEALTHY_UPTIME_SECONDS:
+            attempt = 0
+        attempt += 1
 
-            if mkcc.platform == "Darwin" and mkcc.operation == OpMode.TRAY and mkcc.notifications:
-                reconnecting = [
-                    "./notifier/terminal-notifier.app/Contents/MacOS/terminal-notifier",
-                    "-group",
-                    "cast",
-                    "-contentImage",
-                    noticon,
-                    "-title",
-                    "mkchromecast",
-                    "-subtitle",
-                    "node server failed",
-                    "-message",
-                    "Reconnecting...",
-                ]
-                subprocess.Popen(reconnecting)
+    print(colors.error(
+        "The node streaming server keeps failing; giving up after "
+        f"{NODE_RECONNECT_ATTEMPTS} attempts."))
+    return
 
-                if mkcc.debug is True:
-                    print(
-                        ":::node::: reconnecting notifier command: %s." % reconnecting
-                    )
 
-            # This could potentially cause forkbomb-like behavior where each new
-            # child process would create a new child process, ad infinitum.
-            raise Exception("Internal error: Never worked; needs to be fixed.")
+def watch_until_exit(p: subprocess.Popen, pidnumber: int, localpid: int) -> None:
+    """Blocks until the node server exits.
 
-            relaunch(stream_audio, recasting, kill)
+    Also acts as a watchdog on the main process: if that one is gone, the audio
+    devices are restored and this process tears itself down instead of leaving
+    a stream running with nobody to stop it.
+    """
+    while p.poll() is None:
+        try:
+            time.sleep(0.5)
+            # With this I ensure that if the main app fails, everything
+            # will get back to normal
+            if psutil.pid_exists(pidnumber) is False:
+                inputint()
+                outputint()
+                parent = psutil.Process(localpid)
+                # or parent.children() for recursive=False
+                for child in parent.children(recursive=True):
+                    child.kill()
+                parent.kill()
+        except KeyboardInterrupt:
+            print("Ctrl-c was requested")
+            sys.exit(0)
+        except IOError:
+            print("I/O Error")
+            sys.exit(0)
+        except OSError:
+            print("OSError")
+            sys.exit(0)
+
+
+def notify_reconnecting(mkcc: mkchromecast.Mkchromecast) -> None:
+    """Tells the user through the macOS notifier that node is being restarted."""
+    if mkcc.debug is True:
+        print(
+            ":::node::: platform, tray, notifications: %s, %s, %s."
+            % (mkcc.platform, mkcc.tray, mkcc.notifications)
+        )
+
+    if not (mkcc.platform == "Darwin"
+            and mkcc.operation == OpMode.TRAY
+            and mkcc.notifications):
         return
+
+    if os.path.exists("images/google.icns") is True:
+        noticon = "images/google.icns"
+    else:
+        noticon = "google.icns"
+
+    reconnecting = [
+        "./notifier/terminal-notifier.app/Contents/MacOS/terminal-notifier",
+        "-group",
+        "cast",
+        "-contentImage",
+        noticon,
+        "-title",
+        "mkchromecast",
+        "-subtitle",
+        "node server failed",
+        "-message",
+        "Reconnecting...",
+    ]
+    subprocess.Popen(reconnecting)
+
+    if mkcc.debug is True:
+        print(":::node::: reconnecting notifier command: %s." % reconnecting)
 
 
 class multi_proc(object):
@@ -174,19 +226,6 @@ class multi_proc(object):
 
     def start(self):
         self.proc.start()
-
-
-def kill():
-    pid = os.getpid()
-    os.kill(pid, signal.SIGTERM)
-    return
-
-
-def relaunch(func1, func2, func3):
-    func1()
-    func2()
-    func3()
-    return
 
 
 def recasting():
