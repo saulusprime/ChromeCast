@@ -316,7 +316,7 @@ class Casting:
         else:
             import mkchromecast.audio
 
-            media_type = mkchromecast.audio.media_type
+            media_type = mkchromecast.audio.get_config().media_type
         print(" ")
         print(colors.options("Using media type:") + f" {media_type}")
 

@@ -16,10 +16,44 @@ from mkchromecast.utils import terminate, check_url
 from mkchromecast.resolution import resolutions
 
 class Mkchromecast:
-    """A singleton object that encapsulates Mkchromecast state."""
+    """A singleton object that encapsulates Mkchromecast state.
+
+    Constructing it with no arguments hands back the shared instance and
+    parses the command line only once.  Four modules build one at import
+    time, so this used to mean parsing, loading and validating the config
+    six times per launch.
+
+    Passing `args` explicitly always builds a separate object, which is
+    what the tests rely on.
+    """
     _parsed_args = None
+    _instance: Optional["Mkchromecast"] = None
+    _initialized: bool = False
+
+    def __new__(cls, args = None):
+        if args is not None:
+            return super().__new__(cls)
+
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+
+        return cls._instance
+
+    @classmethod
+    def discard_shared_instance(cls) -> None:
+        """Forgets the shared instance so the next call rebuilds it.
+
+        Settings are read from disk while constructing, so the tray needs
+        this to pick up preference changes.
+        """
+        cls._instance = None
 
     def __init__(self, args = None):
+        # __init__ runs on every call, including those __new__ answered from
+        # the cache, so the shared instance must not be rebuilt.
+        if args is None and self._initialized:
+            return
+
         # TODO(xsdg): Require arg parsing to be done outside of this class.
         first_parse: bool = False
         if not args:
@@ -265,6 +299,7 @@ class Mkchromecast:
         # Argument validation.
         self._validate_input_file()
 
+        self._initialized = True
 
         # Diagnostic messages
         if first_parse:

@@ -321,8 +321,14 @@ class ParentMonitor(object):
                         inputint()
                         outputint()
                     else:
-                        from mkchromecast.pulseaudio import remove_sink
+                        from mkchromecast.pulseaudio import (get_sink_list,
+                                                             remove_sink)
 
+                        # This process does not inherit the parent's memory
+                        # (multiprocessing uses forkserver from Python 3.14
+                        # on), so the module has no record of the sink we
+                        # created and remove_sink alone would do nothing.
+                        get_sink_list()
                         remove_sink()
                     parent = psutil.Process(local_pid)
                     # TODO(xsdg): This is unlikely to finish, given that this

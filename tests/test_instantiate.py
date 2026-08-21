@@ -132,5 +132,69 @@ class BasicInstantiationTest(unittest.TestCase):
         self.assertIn(mkcc.backend, supported)
 
 
+class SharedInstanceTest(unittest.TestCase):
+    """Four modules build a Mkchromecast at import time.
+
+    Without sharing, that meant parsing the command line and loading the
+    config file once per module.
+    """
+
+    def setUp(self):
+        args = mock.Mock()
+        args.debug = False
+        args.encoder_backend = None
+        args.bitrate = constants.DEFAULT_BITRATE
+        args.codec = "mp3"
+        args.command = None
+        args.mtype = None
+        args.resolution = None
+        args.chunk_size = 64
+        args.sample_rate = 44100
+        # Everything that selects an operating mode.
+        args.discover = False
+        args.input_file = None
+        args.reset = False
+        args.screencast = False
+        args.source_url = None
+        args.tray = False
+        args.version = False
+        args.youtube = None
+        args.video = False
+        self.args = args
+
+        self.enterContext(mock.patch.object(
+            _arg_parsing.Parser, "parse_args", return_value=args))
+        self._reset_shared_state()
+        self.addCleanup(self._reset_shared_state)
+
+    def _reset_shared_state(self):
+        mkchromecast.Mkchromecast.discard_shared_instance()
+        mkchromecast.Mkchromecast._parsed_args = None
+
+    def testSharedInstanceIsReused(self):
+        self.assertIs(mkchromecast.Mkchromecast(),
+                      mkchromecast.Mkchromecast())
+
+    def testCommandLineIsParsedOnce(self):
+        for _ in range(4):
+            mkchromecast.Mkchromecast()
+
+        _arg_parsing.Parser.parse_args.assert_called_once()
+
+    def testExplicitArgsBuildASeparateObject(self):
+        shared = mkchromecast.Mkchromecast()
+        standalone = mkchromecast.Mkchromecast(self.args)
+
+        self.assertIsNot(shared, standalone)
+        # ...and leave the shared one alone.
+        self.assertIs(shared, mkchromecast.Mkchromecast())
+
+    def testDiscardingRebuilds(self):
+        first = mkchromecast.Mkchromecast()
+        mkchromecast.Mkchromecast.discard_shared_instance()
+
+        self.assertIsNot(first, mkchromecast.Mkchromecast())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

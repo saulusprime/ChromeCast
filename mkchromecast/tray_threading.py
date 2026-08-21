@@ -66,13 +66,11 @@ class Player(QObject):
             if config_.backend == "node":
                 node.stream_audio()
             else:
-                # TODO(xsdg): Drop this reload stuff.
-                try:
-                    reload(mkchromecast.audio)
-                except NameError:
-                    from importlib import reload
-
-                    reload(mkchromecast.audio)
+                # Preferences are read from disk while building the settings,
+                # so drop the cached ones to pick up any change.  This used to
+                # be a reload() of the audio module, which only worked because
+                # that module did its work on import.
+                mkchromecast.audio.reload_settings()
                 if not mkchromecast.audio.main():
                     self.pcastready.emit("_play_cast_ failed")
                     self.pcastfinished.emit()
