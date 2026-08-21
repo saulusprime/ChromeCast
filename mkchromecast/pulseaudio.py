@@ -1,96 +1,132 @@
 # This file is part of mkchromecast.
 
-import subprocess
-import time
+import json
+import os
 import re
+import subprocess
+from typing import Optional
 
-_sink_num = None
+SINK_NAME = "Mkchromecast"
+
+# pactl translates its human-readable output, so parsing it only works with
+# the locale pinned.  The JSON output has stable, untranslated keys, but it
+# only exists since pactl 16, hence the text fallback in get_sink_list.
+_PACTL_ENV = {**os.environ, "LC_ALL": "C", "LANGUAGE": "C"}
+
+_sink_num: Optional[list[int]] = None
 
 
-def create_sink():
+def _pactl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
+    """Runs pactl with a pinned locale so its output is parseable."""
+    return subprocess.run(
+        ["pactl", *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=_PACTL_ENV,
+        timeout=60,
+        check=check,
+    )
+
+
+def create_sink() -> None:
     global _sink_num
 
-    sink_name = "Mkchromecast"
-
-    create_sink = [
-        "pactl",
+    result = _pactl(
         "load-module",
         "module-null-sink",
-        "sink_name=" + sink_name,
-        "sink_properties=device.description=" + sink_name,
-    ]
+        f"sink_name={SINK_NAME}",
+        f"sink_properties=device.description={SINK_NAME}",
+        check=False,
+    )
 
-    cs = subprocess.Popen(create_sink, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    csoutput, cserror = cs.communicate()
-    _sink_num = csoutput[:-1]
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Could not create the PulseAudio sink: "
+            + result.stderr.decode("utf-8", "replace").strip()
+        )
 
-    return
+    module_index = result.stdout.decode("utf-8").strip()
+    if not module_index.isdigit():
+        raise RuntimeError(
+            f"pactl returned an unexpected module index: {module_index!r}")
+
+    _sink_num = [int(module_index)]
 
 
-def remove_sink():
+def remove_sink() -> None:
     global _sink_num
 
-    if _sink_num is None:
+    if not _sink_num:
         return
 
-    if not isinstance(_sink_num, list):
-        _sink_num = [_sink_num]
-
     for num in _sink_num:
-        remove_sink = [
-            "pactl",
-            "unload-module",
-            num.decode("utf-8") if type(num) == bytes else str(num),
-        ]
-        rms = subprocess.run(
-            remove_sink,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=60,
-            check=True,
-        )
+        # Not fatal: the module may already be gone, for instance because the
+        # sound server restarted underneath us.
+        _pactl("unload-module", str(num), check=False)
+
+    _sink_num = None
 
 
-def check_sink():
+def check_sink() -> Optional[bool]:
+    """Whether our sink exists.  None means pactl is unavailable."""
     try:
-        check_sink = ["pactl", "list", "sinks"]
-        chk = subprocess.Popen(
-            check_sink, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        chkoutput, chkerror = chk.communicate()
+        result = _pactl("list", "sinks", check=False)
     except FileNotFoundError:
         return None
 
-    try:
-        if "Mkchromecast" in chkoutput:
-            return True
-        else:
-            return False
-    except TypeError:
-        if "Mkchromecast" in chkoutput.decode("utf-8"):
-            return True
-        else:
-            return False
+    return SINK_NAME in result.stdout.decode("utf-8", "replace")
 
 
-def get_sink_list():
-    """Get a list of sinks with a name prefix of Mkchromecast and save to _sink_num.
+def get_sink_list() -> None:
+    """Records the modules owning any leftover Mkchromecast sink.
 
-    Used to clear any residual sinks from previous failed actions. The number
-    saved to _sink_num is the module index, which can be passed to pactl.
+    Used to clear residual sinks from previous failed runs.  The values saved
+    to _sink_num are module indices, which can be passed to pactl.
     """
     global _sink_num
 
-    cmd = ["pactl", "list", "sinks"]
-    result = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60, check=True
-    )
+    _sink_num = _get_sink_list_json()
+    if _sink_num is None:
+        _sink_num = _get_sink_list_text()
+
+
+def _get_sink_list_json() -> Optional[list[int]]:
+    """Reads the module indices from pactl's JSON output.
+
+    Returns None when this pactl is too old to support --format=json.
+    """
+    result = _pactl("--format=json", "list", "sinks", check=False)
+    if result.returncode != 0:
+        return None
+
+    try:
+        sinks = json.loads(result.stdout.decode("utf-8", "replace"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+    try:
+        return [
+            int(sink["owner_module"])
+            for sink in sinks
+            if str(sink.get("name", "")).startswith(SINK_NAME)
+        ]
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _get_sink_list_text() -> list[int]:
+    """Reads the module indices by parsing pactl's plain-text output."""
+    result = _pactl("list", "sinks")
 
     pattern = re.compile(
-        r"^Sink\s*#\d+\s*$(?:\n^.*?$)*?\n\s*?Name:\s*?Mkchromecast.*"
-        + r"\s*?$(?:\n^.*?$)*?\n^\s*?Owner Module: (?P<module>\d+?)\s*?$",
+        r"^Sink\s*#\d+\s*$(?:\n^.*?$)*?\n\s*?Name:\s*?" + SINK_NAME + r".*"
+        r"\s*?$(?:\n^.*?$)*?\n^\s*?Owner Module: (?P<module>\d+?)\s*?$",
         re.MULTILINE,
     )
-    matches = pattern.findall(result.stdout.decode("utf-8"), re.MULTILINE)
 
-    _sink_num = [int(i) for i in matches]
+    # NOTE: findall's second positional argument is `pos`, not a flags value.
+    # Passing re.MULTILINE there used to skip the first 8 characters of the
+    # output, which hid the very first sink in the list.
+    matches = pattern.findall(result.stdout.decode("utf-8", "replace"))
+
+    return [int(i) for i in matches]
