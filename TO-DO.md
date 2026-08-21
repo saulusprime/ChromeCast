@@ -22,9 +22,14 @@ altrove.
 
 ---
 
-## 🔴 P0 — Bloccanti
+## 🔴 P0 — Bloccanti  ✅ RISOLTI
 
-### #1 — Il fallimento del bind di Flask non viene rilevato
+Corretti sul branch `fix/p0-blockers` (commit `d059f9d9`, `6d97a3de`,
+`80ffc734`). Le sezioni sotto restano come documentazione del problema.
+Verifica: 33/33 test verdi, cast reale riuscito verso un Chromecast
+(`status_text='Trasmissione: Mkchromecast v0.3.9'`), nessun sink residuo.
+
+### #1 — Il fallimento del bind di Flask non viene rilevato  ✅ `d059f9d9`
 
 **Sintomo.** `mkchromecast -n <device>` sembra partire, il Chromecast si
 attiva, ma non esce audio.
@@ -118,7 +123,7 @@ def main():
 
 ---
 
-### #2 — Crash con pychromecast 14: `RequestFailed: Failed to execute play`
+### #2 — Crash con pychromecast 14: `RequestFailed: Failed to execute play`  ✅ `6d97a3de`
 
 **Sintomo.** Traceback Python non gestito subito dopo l'avvio del cast.
 
@@ -191,7 +196,7 @@ codice (vedi anche #10).
 
 ---
 
-### #3 — `pip install PyGObject` fallisce → `import gi` non funziona
+### #3 — `pip install PyGObject` fallisce → `import gi` non funziona  ✅ `80ffc734`
 
 **Sintomo.** L'installazione dei requirements si interrompe. È il motivo per
 cui `PyGObject` è stato spostato in fondo a `requirements.txt` (modifica non
@@ -598,6 +603,17 @@ già marcata come rotta, ma va sistemato quando la si riabilita.
   quindi le chiavi mancanti non vengono **mai** salvate e vengono ricalcolate
   ad ogni avvio.
 
+- **`tray_threading.py`: la globale `cast` viene ribindata da modulo a
+  oggetto.** `_play_cast_` dichiara `global cast` e poi fa `cast = start.cast`
+  ([`tray_threading.py:52`](mkchromecast/tray_threading.py#L52),
+  [`:78`](mkchromecast/tray_threading.py#L78)). Dopo il primo play riuscito il
+  nome `cast` non è più il modulo, quindi alla chiamata successiva
+  `cast.Casting(_mkcc)` ([`:73`](mkchromecast/tray_threading.py#L73)) alza
+  `AttributeError` fuori da qualsiasi `try`, uccidendo il thread della tray.
+  Trovato mentre si applicava il fix #2 (per questo `CastError` è importata
+  direttamente e non come `cast.CastError`). Usare un attributo d'istanza al
+  posto della globale.
+
 - **`tray_threading.py:101`**: `if chk.ip == "127.0.0.1" or None:` — l'`or None`
   non ha alcun effetto (si valuta sempre il primo operando). Poco sotto, il
   confronto di versioni è fra stringhe e usa
@@ -653,9 +669,9 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 
 ## Checklist
 
-- [ ] #1 Rilevare il fallimento di bind + readiness check (`stream_infra.py`, `audio.py`, `video.py`)
-- [ ] #2 `block_until_active()` + `quit_app()` + `try/except RequestFailed` (`cast.py`); pinnare `pychromecast>=14,<15`
-- [ ] #3 Rendere `PyGObject` opzionale; gestire `ValueError` su `require_version` (`systray.py`)
+- [x] #1 Rilevare il fallimento di bind + readiness check (`stream_infra.py`, `audio.py`, `video.py`) — `d059f9d9`
+- [x] #2 `block_until_active()` + `quit_app()` + `try/except RequestFailed` (`cast.py`); pinnare `pychromecast>=14,<15` — `6d97a3de`
+- [x] #3 Rendere `PyGObject` opzionale; gestire `ValueError` su `require_version` (`systray.py`) — `80ffc734`
 - [ ] #4 `LC_ALL=C` + parsing JSON in tutte le chiamate a `pactl` (`pulseaudio.py`)
 - [ ] #5 `findall(testo)` senza il flag come `pos` (`pulseaudio.py:94`)
 - [ ] #6 `--rate` a `parec` + rate di input a `lame`/`oggenc`/`faac`; aggiornare i test
