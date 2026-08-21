@@ -295,17 +295,27 @@ def _resolve_ip_nonlinux():
     try:
         return socket.gethostbyname(f"{socket.gethostname()}.local")
     except socket.gaierror:
-        return _get_first_network_ip_by_netifaces()
+        return _get_first_network_ip()
 
 
-def _get_first_network_ip_by_netifaces():
-    import netifaces
+def _get_first_network_ip() -> Optional[str]:
+    """Returns the first non-loopback IPv4 address of any interface.
 
-    interfaces = netifaces.interfaces()
-    for interface in interfaces:
-        if interface == "lo":
-            continue
-        iface = netifaces.ifaddresses(interface).get(netifaces.AF_INET)
-        if iface != None and iface[0]["addr"] != "127.0.0.1":
-            for e in iface:
-                return str(e["addr"])
+    Uses ifaddr rather than netifaces, which is unmaintained and has no
+    wheels for current Python versions.  ifaddr already ships as a
+    dependency of zeroconf, which pychromecast pulls in.
+    """
+    import ifaddr
+
+    for adapter in ifaddr.get_adapters():
+        for ip in adapter.ips:
+            if not ip.is_IPv4:
+                continue
+
+            address = str(ip.ip)
+            if address.startswith("127."):
+                continue
+
+            return address
+
+    return None

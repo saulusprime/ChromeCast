@@ -73,5 +73,34 @@ class VersionTupleTests(unittest.TestCase):
             utils.version_tuple("0.3.9") > utils.version_tuple("0.3.9"))
 
 
+class FirstNetworkIpTests(unittest.TestCase):
+    def _adapter(self, *ips):
+        adapter = mock.Mock()
+        adapter.ips = []
+        for address, is_ipv4 in ips:
+            ip = mock.Mock()
+            ip.ip = address
+            ip.is_IPv4 = is_ipv4
+            adapter.ips.append(ip)
+        return adapter
+
+    def _with_adapters(self, adapters):
+        fake_ifaddr = mock.Mock()
+        fake_ifaddr.get_adapters.return_value = adapters
+        return mock.patch.dict("sys.modules", {"ifaddr": fake_ifaddr})
+
+    def testSkipsLoopbackAndIPv6(self):
+        adapters = [
+            self._adapter(("127.0.0.1", True), (("::1", 0, 0), False)),
+            self._adapter((("fe80::1", 0, 2), False), ("192.168.1.5", True)),
+        ]
+        with self._with_adapters(adapters):
+            self.assertEqual("192.168.1.5", utils._get_first_network_ip())
+
+    def testReturnsNoneWhenOnlyLoopback(self):
+        with self._with_adapters([self._adapter(("127.0.0.1", True))]):
+            self.assertIsNone(utils._get_first_network_ip())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

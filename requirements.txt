@@ -1,7 +1,7 @@
 requests
 psutil
 Flask
-netifaces
+ifaddr
 pychromecast>=14,<15
 PyQt5
 soco

@@ -44,12 +44,24 @@ LINUX_DATA = [
     ("share/applications/", ["mkchromecast.desktop"]),
     ("share/man/man1", ["mkchromecast.1"]),
 ]
-LINUX_REQUIRES = ["flask", "mutagen", "netifaces", "psutil", "PyQt5", "requests"]
+# Keep in sync with requirements.txt.  This list was missing pychromecast,
+# soco and the network library, and named mutagen, which is not imported
+# anywhere.
+LINUX_REQUIRES = [
+    "Flask",
+    "ifaddr",
+    "psutil",
+    "pychromecast>=14,<15",
+    "PyQt5",
+    "requests",
+    "soco",
+]
 LINUX_CLASSIFIERS = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.6",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
 ]
 
 APP = ["start_tray.py"]
@@ -112,5 +124,8 @@ elif platform.system() == "Linux":
         scripts=["bin/mkchromecast"],
         classifiers=LINUX_CLASSIFIERS,
         data_files=LINUX_DATA,
-        requires=LINUX_REQUIRES,
+        # `requires` is deprecated and silently ignored by setuptools, so
+        # nothing was ever installed for us.
+        install_requires=LINUX_REQUIRES,
+        python_requires=">=3.9",
     )
