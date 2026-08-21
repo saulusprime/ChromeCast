@@ -22,6 +22,7 @@ che il codice non manteneva (#14). Suite di test da 33 a **62** casi.
 | pychromecast | **14.0.10** — il progetto dichiara solo `pychromecast>=4.2` |
 | Encoder | `lame`, `oggenc`, `opusenc`, `sox`, `flac` presenti; **`faac` assente** |
 | Porta 5000 | **occupata da `shairport-sync.service`** ← rilevante, vedi #1 |
+| Device di prova | **Seminterrato** — sintoampli Sony TA-AN1000 collegato alle casse (192.168.1.126) — e **Salotto** |
 
 Stato di partenza: suite di test **33/33 OK**, discovery funzionante, pipeline
 `parec | lame` funzionante (94 KB di MP3 valido in 6 s). I problemi stanno
@@ -36,7 +37,9 @@ altrove.
 Corretti sul branch `fix/p0-blockers` (commit `d059f9d9`, `6d97a3de`,
 `80ffc734`). Le sezioni sotto restano come documentazione del problema.
 Verifica: 33/33 test verdi, cast reale riuscito verso un Chromecast
-(`status_text='Trasmissione: Mkchromecast v0.3.9'`), nessun sink residuo.
+(`status_text='Trasmissione: Mkchromecast v0.3.9'`), nessun sink residuo. La
+sessione completa, con l'output riga per riga, è in
+[Prova completa: cast audio reale](#prova-completa-cast-audio-reale).
 
 ### #1 — Il fallimento del bind di Flask non viene rilevato  ✅ `d059f9d9`
 
@@ -851,27 +854,83 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 
 ## Verifiche di regressione
 
+> **Attenzione a quale eseguibile si lancia.** `mkchromecast` sul PATH è
+> `/usr/bin/mkchromecast`, il pacchetto apt `0.3.9~git20200902+db2964a` del
+> 2020, che carica `/usr/lib/python3/dist-packages/mkchromecast/`: **non
+> contiene niente di quanto è documentato qui**. Le verifiche vanno fatte con
+> l'albero di lavoro, e con il python del venv (quello di sistema non ha
+> `pychromecast>=14` né `ifaddr`):
+>
+> ```bash
+> MKC=".venv/bin/python bin/mkchromecast"
+> ```
+>
+> `bin/mkchromecast` si mette da solo la radice del repo in `sys.path`, quindi
+> la forma con percorsi assoluti funziona da qualunque directory.
+
 ```bash
 # 1. i test devono restare verdi (33 prima dei fix, 62 dopo)
 python -m unittest discover -s tests -v
 
 # 2. discovery: output visibile anche in pipe, exit code 0
-mkchromecast --discover | cat ; echo "exit=$?"
+$MKC --discover | cat ; echo "exit=$?"
 
 # 3. reset: deve funzionare nel locale dell'utente, non solo in C
 pactl load-module module-null-sink sink_name=Mkchromecast
-mkchromecast --reset
+$MKC --reset
 pactl list sinks short | grep -i mkchrome    # deve essere vuoto
 
 # 4. porta occupata: messaggio chiaro, niente cast a vuoto
-mkchromecast -p 5000 -n <device>             # con shairport-sync attivo
+$MKC -p 5000 -n <device>                     # con shairport-sync attivo
 
 # 5. coerenza del sample rate
 parec -v --format=s16le --rate=48000 -d Mkchromecast.monitor   # deve dire 48000Hz
 
 # 6. selezione del device: un indice sbagliato richiede, non uccide
-mkchromecast -s --discover                   # digita 99, poi un indice valido
+$MKC -s --discover                           # digita 99, poi un indice valido
 
 # 7. sottotitoli su file non-mkv, con e senza --resolution
-mkchromecast --video -i film.mp4 --subtitles sub.srt --resolution 720p
+$MKC --video -i film.mp4 --subtitles sub.srt --resolution 720p
 ```
+
+### Prova completa: cast audio reale
+
+Il percorso intero, dal sink al ricevitore, provato il 21 agosto 2026 verso il
+Sony TA-AN1000:
+
+```console
+$ .venv/bin/python bin/mkchromecast -n Seminterrato -p 5001
+Creating Pulseaudio Sink...
+Starting Local Streaming Server
+Selected backend: BackendInfo(name='parec', path='/usr/bin/parec')
+Selected audio codec: mp3
+Using bitrate: 192
+Using sample rate: 44100Hz
+ * Running on http://192.168.1.192:5001
+[Done]
+
+Status of device  Seminterrato
+CastStatus(..., app_id=None, session_id=None, status_text='', ...)
+
+The IP of Seminterrato is: 192.168.1.126
+Using media type: audio/mpeg
+192.168.1.126 - - [21/Aug/2026 21:06:11] "GET /stream HTTP/1.1" 200 -
+
+Cast media controller status
+CastStatus(..., app_id='CC1AD845', display_name='Default Media Receiver',
+           session_id='54d1e1c1-...', status_text='Trasmissione: Mkchromecast v0.3.9', ...)
+```
+
+Cosa conferma, riga per riga:
+
+| Riga | Conferma |
+|---|---|
+| `Running on ...:5001` seguito da `[Done]` | #1: il controllo della porta e l'attesa di readiness passano; con la 5000 occupata si sarebbe fermato con un errore invece di castare a vuoto |
+| `app_id=None` → `app_id='CC1AD845'` con `session_id` | #2: `block_until_active()` fa il suo lavoro. Con il codice originale qui usciva `RequestFailed: Failed to execute play` |
+| `GET /stream HTTP/1.1" 200` dal device | Il ricevitore apre davvero lo stream, non si limita ad accettare il comando |
+| `BackendInfo(name='parec', path='/usr/bin/parec')` | `536f7d73`: il backend è risolto sul PATH, non da percorsi fissi |
+| Ogni riga di impostazioni stampata **una volta sola** | `a9936424`: prima del passaggio a `forkserver` comparivano doppie, perché il processo di streaming re-importava `audio.py` |
+
+Il ritardo di mp3 su questo percorso resta quello noto (fino a ~8 s). Ora che
+il sample rate arriva davvero anche a `parec` (#6), `-c flac --sample-rate
+48000` è un'alternativa che prima veniva ignorata in silenzio.

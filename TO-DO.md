@@ -63,5 +63,8 @@ Per qualunque intervento futuro:
 python -m unittest discover -s tests -v
 ```
 
-Le verifiche funzionali complete sono in
-[AS-IS.md](AS-IS.md#verifiche-di-regressione).
+Per le prove sul campo, attenzione a quale eseguibile si lancia: `mkchromecast`
+sul PATH può essere il pacchetto della distribuzione, non l'albero di lavoro.
+Si usa `.venv/bin/python bin/mkchromecast`, come spiegato nelle
+[verifiche di regressione](AS-IS.md#verifiche-di-regressione), dove c'è anche
+la [prova completa del cast audio](AS-IS.md#prova-completa-cast-audio-reale).
