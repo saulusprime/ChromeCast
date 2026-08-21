@@ -112,9 +112,26 @@ class Mkchromecast:
             self.platform, args.video
         )
 
+        default_backend: str
+        if args.video:
+            default_backend = "ffmpeg"
+        elif self.platform == "Darwin":
+            default_backend = "node"
+        else:  # self.platform == "Linux"
+            default_backend = "parec"
+
         self.backend: Optional[str]
         if tray_config:
+            # Unlike --encoder-backend, the config file is not validated
+            # anywhere else, so a stale or hand-edited value would reach
+            # backends that cannot work on this platform.
             self.backend = tray_config.backend
+            if self.backend not in backend_options:
+                print(colors.warning(
+                    f"Backend {self.backend!r} from the config file is not "
+                    f"supported on {self.platform}; using "
+                    f"{default_backend!r} instead."))
+                self.backend = default_backend
         elif args.encoder_backend:
             if args.encoder_backend not in backend_options:
                 print(colors.error(f"Backend {args.encoder_backend} is not in "
@@ -126,12 +143,7 @@ class Mkchromecast:
             # encoder_backend is reasonable.
             self.backend = args.encoder_backend
         else:
-            if args.video:
-                self.backend = "ffmpeg"
-            elif self.platform == "Darwin":
-                self.backend = "node"
-            else:  # self.platform == "Linux"
-                self.backend = "parec"
+            self.backend = default_backend
 
         codec_choices = ["mp3", "ogg", "aac", "opus", "wav", "flac"]
         self.codec: str

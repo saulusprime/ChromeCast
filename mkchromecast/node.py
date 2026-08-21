@@ -14,6 +14,7 @@ import multiprocessing
 import os
 import pickle
 import psutil
+import shutil
 import time
 import re
 import sys
@@ -38,45 +39,55 @@ def streaming(mkcc: mkchromecast.Mkchromecast):
             % (mkcc.backend, mkcc.codec, mkcc.bitrate, mkcc.samplerate, mkcc.notifications)
         )
 
-    bitrate: int
-    samplerate: int
-    if mkcc.youtube_url is None:
-        if mkcc.backend == "node":
-            bitrate = utils.clamp_bitrate(mkcc.codec, bitrate)
-            print(colors.options("Using bitrate: ") + f"{bitrate}k.")
+    # These were only annotated, never assigned, so the first read below
+    # raised UnboundLocalError and the node backend could never run.
+    bitrate: int = mkcc.bitrate
+    samplerate: int = mkcc.samplerate
 
-            if mkcc.codec in constants.QUANTIZED_SAMPLE_RATE_CODECS:
-                samplerate = utils.quantize_sample_rate(mkcc.codec, mkcc.samplerate)
+    if mkcc.youtube_url is None and mkcc.backend == "node":
+        bitrate = utils.clamp_bitrate(mkcc.codec, bitrate)
+        print(colors.options("Using bitrate: ") + f"{bitrate}k.")
 
-            print(colors.options("Using sample rate:") + f" {samplerate}Hz.")
+        if mkcc.codec in constants.QUANTIZED_SAMPLE_RATE_CODECS:
+            samplerate = utils.quantize_sample_rate(mkcc.codec, samplerate)
+
+        print(colors.options("Using sample rate:") + f" {samplerate}Hz.")
 
     """
     Node section
     """
-    paths = ["/usr/local/bin/node", "./bin/node", "./nodejs/bin/node"]
+    # Look on the user's PATH first: the previous hardcoded list only covered
+    # /usr/local/bin/node, so a distro node (/usr/bin/node on Debian and
+    # Ubuntu) was reported as "not installed".
+    node_bin = shutil.which("node") or shutil.which("nodejs")
+    if node_bin is None:
+        for bundled in ["./bin/node", "./nodejs/bin/node"]:
+            if os.path.exists(bundled):
+                node_bin = bundled
+                break
 
-    for path in paths:
-        if os.path.exists(path) is True:
-            webcast = [
-                path,
-                "./nodejs/node_modules/webcast-osx-audio/bin/webcast.js",
-                "-b",
-                str(bitrate),
-                "-s",
-                str(samplerate),
-                "-p",
-                "5000",
-                "-u",
-                "stream",
-            ]
-            break
-    else:
+    if node_bin is None:
         webcast = None
         print(colors.warning("Node is not installed..."))
         print(
             colors.warning("Use your package manager or their official " "installer...")
         )
-        pass
+    else:
+        webcast = [
+            node_bin,
+            "./nodejs/node_modules/webcast-osx-audio/bin/webcast.js",
+            "-b",
+            str(bitrate),
+            "-s",
+            str(samplerate),
+            # Was hardcoded to 5000, which broke --port: cast.py builds the
+            # media URL from mkcc.port, so the device asked for a port nothing
+            # was listening on.
+            "-p",
+            str(mkcc.port),
+            "-u",
+            "stream",
+        ]
 
     if webcast is not None:
         p = subprocess.Popen(webcast)

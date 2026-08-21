@@ -66,7 +66,8 @@ class BasicInstantiationTest(unittest.TestCase):
         mock_args.tray = True
 
         # Setting the mock config contents.
-        mock_config.backend = "backend"
+        # Must be a real backend: it is validated against the platform.
+        mock_config.backend = "ffmpeg"
         mock_config.codec = "codec"
         mock_config.bitrate = 12345
         mock_config.samplerate = 54321
@@ -80,7 +81,7 @@ class BasicInstantiationTest(unittest.TestCase):
         # We should find that the mock config values are returned by mkcc, even
         # when they are defined differently in args (for instance, bitrate,
         # codec, and samplerate above)
-        self.assertEqual(mkcc.backend, "backend")
+        self.assertEqual(mkcc.backend, "ffmpeg")
         self.assertEqual(mkcc.codec, "codec")
         self.assertEqual(mkcc.bitrate, 12345)
         self.assertEqual(mkcc.samplerate, 54321)
@@ -88,6 +89,47 @@ class BasicInstantiationTest(unittest.TestCase):
         self.assertEqual(mkcc.colors, "colors")
         self.assertEqual(mkcc.search_at_launch, False)
         self.assertEqual(mkcc.adevice, "alsa_device")
+
+    def testTrayModeRejectsUnsupportedBackend(self):
+        """A backend from the config file that this platform cannot use.
+
+        --encoder-backend is validated, but the config file was not, so a
+        stale or hand-edited value used to be taken at face value.
+        """
+        mock_config = mock.create_autospec(config.Config, spec_set=True)
+        self.enterContext(mock.patch.object(config, "Config", return_value=mock_config))
+
+        mock_args = mock.Mock()
+        mock_args.encoder_backend = None
+        mock_args.bitrate = constants.DEFAULT_BITRATE
+        mock_args.codec = 'mp3'
+        mock_args.command = None
+        mock_args.resolution = None
+        mock_args.chunk_size = 64
+        mock_args.sample_rate = 44100
+        mock_args.youtube = None
+        mock_args.input_file = None
+        mock_args.discover = False
+        mock_args.reset = False
+        mock_args.screencast = False
+        mock_args.source_url = None
+        mock_args.tray = True
+        mock_args.video = False
+
+        mock_config.backend = "not-a-real-backend"
+        mock_config.codec = "mp3"
+        mock_config.bitrate = 192
+        mock_config.samplerate = 44100
+        mock_config.notifications = False
+        mock_config.colors = "black"
+        mock_config.search_at_launch = False
+        mock_config.alsa_device = None
+
+        mkcc = mkchromecast.Mkchromecast(mock_args)
+
+        supported = constants.backend_options_for_platform(
+            mkcc.platform, mock_args.video)
+        self.assertIn(mkcc.backend, supported)
 
 
 if __name__ == "__main__":

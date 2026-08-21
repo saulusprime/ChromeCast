@@ -656,7 +656,7 @@ class _DisabledSonosCasting:
                     + colors.success(self.cast_to)
                 )
                 print(" ")
-                print(self.cast.device)
+                print(self.cast.cast_info)
                 print(" ")
                 print(
                     colors.important("Status of device ")
