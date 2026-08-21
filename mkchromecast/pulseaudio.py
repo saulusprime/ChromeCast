@@ -16,16 +16,27 @@ _PACTL_ENV = {**os.environ, "LC_ALL": "C", "LANGUAGE": "C"}
 _sink_num: Optional[list[int]] = None
 
 
+class PulseAudioNotAvailable(RuntimeError):
+    """Raised when pactl is not installed or cannot be reached."""
+
+
 def _pactl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
     """Runs pactl with a pinned locale so its output is parseable."""
-    return subprocess.run(
-        ["pactl", *args],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env=_PACTL_ENV,
-        timeout=60,
-        check=check,
-    )
+    try:
+        return subprocess.run(
+            ["pactl", *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=_PACTL_ENV,
+            timeout=60,
+            check=check,
+        )
+    except FileNotFoundError as e:
+        raise PulseAudioNotAvailable(
+            "pactl was not found. Install it (on Debian and Ubuntu: "
+            "`sudo apt install pulseaudio-utils`), or select an ALSA device "
+            "with --alsa-device."
+        ) from e
 
 
 def create_sink() -> None:
@@ -40,14 +51,14 @@ def create_sink() -> None:
     )
 
     if result.returncode != 0:
-        raise RuntimeError(
+        raise PulseAudioNotAvailable(
             "Could not create the PulseAudio sink: "
             + result.stderr.decode("utf-8", "replace").strip()
         )
 
     module_index = result.stdout.decode("utf-8").strip()
     if not module_index.isdigit():
-        raise RuntimeError(
+        raise PulseAudioNotAvailable(
             f"pactl returned an unexpected module index: {module_index!r}")
 
     _sink_num = [int(module_index)]
@@ -61,19 +72,25 @@ def remove_sink() -> None:
 
     for num in _sink_num:
         # Not fatal: the module may already be gone, for instance because the
-        # sound server restarted underneath us.
-        _pactl("unload-module", str(num), check=False)
+        # sound server restarted underneath us.  This also runs during cleanup,
+        # where raising would mask whatever we were already exiting for.
+        try:
+            _pactl("unload-module", str(num), check=False)
+        except PulseAudioNotAvailable:
+            return
 
     _sink_num = None
 
 
-def check_sink() -> Optional[bool]:
-    """Whether our sink exists.  None means pactl is unavailable."""
-    try:
-        result = _pactl("list", "sinks", check=False)
-    except FileNotFoundError:
-        return None
+def check_sink() -> bool:
+    """Returns whether our sink already exists.
 
+    Raises:
+        PulseAudioNotAvailable: if pactl is not installed.  It used to return
+            None in that case, which callers testing `is False` silently read
+            as "the sink exists", so no sink was ever created.
+    """
+    result = _pactl("list", "sinks", check=False)
     return SINK_NAME in result.stdout.decode("utf-8", "replace")
 
 

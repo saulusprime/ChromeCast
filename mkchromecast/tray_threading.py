@@ -9,12 +9,14 @@ from mkchromecast import cast
 from mkchromecast import colors
 from mkchromecast import config
 from mkchromecast import node
+from mkchromecast import utils
 from mkchromecast.audio_devices import inputdev, outputdev
 # Imported directly: the `cast` global below gets rebound to a Chromecast
 # instance, so `cast.CastError` is not reliable inside _play_cast_.
 from mkchromecast.cast import CastError
 from mkchromecast.constants import OpMode
-from mkchromecast.pulseaudio import create_sink, check_sink
+from mkchromecast.pulseaudio import (check_sink, create_sink,
+                                     PulseAudioNotAvailable)
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 
 
@@ -47,9 +49,16 @@ class Player(QObject):
     pcastfinished = pyqtSignal()
     pcastready = pyqtSignal(str)
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # The device we are currently playing to, for the tray to read back.
+        # This used to be a module-level global that _play_cast_ rebound from
+        # the `cast` module to a Chromecast instance, which broke every
+        # subsequent `cast.Casting(...)` lookup in this same function.
+        self.cast = None
+
     @pyqtSlot()
     def _play_cast_(self):
-        global cast
         config_ = config.Config(platform=_mkcc.platform,
                                 read_only=True,
                                 debug=_mkcc.debug)
@@ -68,17 +77,23 @@ class Player(QObject):
                     self.pcastready.emit("_play_cast_ failed")
                     self.pcastfinished.emit()
                     return
-        if _mkcc.platform == "Linux":
+        if _mkcc.platform == "Linux" and _mkcc.adevice is None:
             # We create the sink only if it is not available
-            if check_sink() is False and _mkcc.adevice is None:
-                create_sink()
+            try:
+                if not check_sink():
+                    create_sink()
+            except PulseAudioNotAvailable as e:
+                print(colors.error(str(e)))
+                self.pcastready.emit("_play_cast_ failed")
+                self.pcastfinished.emit()
+                return
 
         start = cast.Casting(_mkcc)
         start.initialize_cast()
         try:
             start.get_devices()
             start.play_cast()
-            cast = start.cast
+            self.cast = start.cast
             # Let's change inputs at the end to avoid muting sound too early.
             # For Linux it does not matter given that user has to select sink
             # in pulse audio.  Therefore the sooner it is available, the
@@ -96,7 +111,6 @@ class Player(QObject):
 
 url = "https://api.github.com/repos/muammar/mkchromecast/releases/latest"
 
-
 class Updater(QObject):
     """This class is employed to check for new mkchromecast versions"""
 
@@ -106,29 +120,28 @@ class Updater(QObject):
     @pyqtSlot()
     def _updater_(self):
         chk = cast.Casting(_mkcc)
-        if chk.ip == "127.0.0.1" or None:  # We verify the local IP.
+        # `or None` here was a no-op: the left operand is always the result.
+        if chk.ip == "127.0.0.1":  # We verify the local IP.
             self.updateready.emit("None")
         else:
+            import requests
+
             try:
                 from mkchromecast.version import __version__
-                import requests
 
-                response = requests.get(url).text.split(",")
+                # Was scraped out of the raw response with str.strip, which
+                # removes a *set of characters* rather than a prefix.
+                latest = requests.get(url, timeout=10).json()["tag_name"]
 
-                for e in response:
-                    if "tag_name" in e:
-                        version = e.strip('"tag_name":')
-                        break
-
-                if version > __version__:
-                    print("Version %s is available to download" % version)
-                    self.updateready.emit(version)
+                if (utils.version_tuple(latest)
+                        > utils.version_tuple(__version__)):
+                    print("Version %s is available to download" % latest)
+                    self.updateready.emit(latest)
                 else:
                     print("You are up to date.")
                     self.updateready.emit("False")
-            except UnboundLocalError:
-                self.updateready.emit("error1")
-            except requests.exceptions.ConnectionError:
+            except (requests.exceptions.RequestException,
+                    ValueError, KeyError, TypeError):
                 self.updateready.emit("error1")
 
         self.upcastfinished.emit()

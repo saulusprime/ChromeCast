@@ -19,7 +19,8 @@ from mkchromecast.audio_devices import (inputint, inputdev, outputdev,
 from mkchromecast import cast
 from mkchromecast import colors
 from mkchromecast.constants import OpMode
-from mkchromecast.pulseaudio import create_sink, get_sink_list, remove_sink
+from mkchromecast.pulseaudio import (create_sink, get_sink_list,
+                                     remove_sink, PulseAudioNotAvailable)
 from mkchromecast.utils import (checkmktmp, del_tmp, kill_children,
                                terminate, writePidFile)
 
@@ -304,6 +305,6 @@ if __name__ == "__main__":
 
     try:
         CastProcess(mkcc).run()
-    except cast.CastError as e:
+    except (cast.CastError, PulseAudioNotAvailable) as e:
         print(colors.error(str(e)))
         sys.exit(1)

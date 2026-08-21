@@ -389,7 +389,7 @@ class menubar(QtWidgets.QMainWindow):
         if message == "_play_cast_ success":
             self.pcastfailed = False
             if os.path.exists("/tmp/mkchromecast.tmp") is True:
-                self.cast = mkchromecast.tray_threading.cast
+                self.cast = self._player.cast
 
             self.set_icon_idle()
         else:

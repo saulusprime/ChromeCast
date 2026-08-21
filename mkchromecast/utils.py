@@ -195,6 +195,24 @@ def is_installed(name, path, debug) -> bool:
     return False
 
 
+def version_tuple(version: str) -> tuple[int, ...]:
+    """Turns a version string such as "v0.3.10" into a comparable tuple.
+
+    Comparing the strings directly, as the updater used to, ranks "0.3.9"
+    above "0.3.10".
+    """
+    numbers: list[int] = []
+    for chunk in version.strip().lstrip("vV").split("."):
+        digits = ""
+        for char in chunk:
+            if not char.isdigit():
+                break
+            digits += char
+        numbers.append(int(digits) if digits else 0)
+
+    return tuple(numbers)
+
+
 def check_url(url):
     """Check if a URL is correct"""
     try:
