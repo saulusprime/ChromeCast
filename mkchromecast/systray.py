@@ -36,6 +36,33 @@ except ImportError:
     chromecast = False
 
 
+# A git checkout keeps images/ next to the package; an installed copy puts
+# them under /usr/share; the macOS .app bundle puts them in its own cwd.
+_REPO_IMAGES = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images")
+_INSTALLED_IMAGES = "/usr/share/mkchromecast/images"
+
+
+def icon_path(icon_name: str) -> str:
+    """Returns the path to an icon, whatever the working directory is.
+
+    The old code tested for the macOS .icns file to decide whether to load
+    the Linux .png, and used paths relative to the working directory, so
+    icons vanished when mkchromecast was started from anywhere else.
+    """
+    extension = "icns" if _mkcc.platform == "Darwin" else "png"
+    filename = f"{icon_name}.{extension}"
+
+    for directory in (_REPO_IMAGES, _INSTALLED_IMAGES, os.curdir):
+        candidate = os.path.join(directory, filename)
+        if os.path.exists(candidate):
+            return candidate
+
+    # Nothing matched; return the installed path so Qt reports the miss
+    # against a location that means something.
+    return os.path.join(_INSTALLED_IMAGES, filename)
+
+
 def linux_notify(message: str) -> None:
     """Shows a desktop notification through libnotify, when it is available.
 
@@ -160,22 +187,8 @@ class menubar(QtWidgets.QMainWindow):
         # TODO(xsdg): Is this used?  Is this a special field?
         self.w = QWidget()
 
-        # This is useful when launching from git repo
-        icon_name = self.google[self.config.colors]
-        if os.path.exists(f"images/{icon_name}.icns"):
-            self.icon = QtGui.QIcon()
-            if _mkcc.platform == "Darwin":
-                self.icon.addFile(f"images/{icon_name}.icns")
-            else:
-                self.icon.addFile(f"images/{icon_name}.png")
-        else:
-            self.icon = QtGui.QIcon()
-            if _mkcc.platform == "Linux":
-                self.icon.addFile(
-                    f"/usr/share/mkchromecast/images/{icon_name}.png"
-                )
-            else:
-                self.icon.addFile(f"{icon_name}.icns")
+        self.icon = QtGui.QIcon()
+        self.icon.addFile(icon_path(self.google[self.config.colors]))
 
         super().__init__()
 
@@ -256,18 +269,7 @@ class menubar(QtWidgets.QMainWindow):
         self.cast_list()
 
     def _set_generic_icon(self, icon_set: dict):
-        icon_name = icon_set[self.config.colors]
-        if os.path.exists(f"images/{icon_name}.icns"):
-            if _mkcc.platform == "Darwin":
-                self.tray.setIcon(QtGui.QIcon(f"images/{icon_name}.icns"))
-            else:
-                self.tray.setIcon(QtGui.QIcon(f"images/{icon_name}.png"))
-        else:
-            if _mkcc.platform == "Linux":
-                self.tray.setIcon(QtGui.QIcon(
-                    f"/usr/share/mkchromecast/images/{icon_name}.png"))
-            else:
-                self.tray.setIcon(QtGui.QIcon(f"{icon_name}.icns"))
+        self.tray.setIcon(QtGui.QIcon(icon_path(icon_set[self.config.colors])))
 
     def set_icon_working(self):
         """docstring for fnamicon_working"""

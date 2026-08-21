@@ -21,6 +21,11 @@ SEARCH_AT_LAUNCH = "search_at_launch"
 ALSA_DEVICE = "alsa_device"
 
 
+# Several modules build a Config at import time, so without this the same
+# warning was printed half a dozen times per launch.
+_warned_about_beta_path = False
+
+
 def _default_config_path(platform: str) -> pathlib.Path:
     config_dir: pathlib.PurePath
     if platform == "Darwin":
@@ -34,7 +39,11 @@ def _default_config_path(platform: str) -> pathlib.Path:
     # TODO(xsdg): Switch this back to mkchromecast.cfg.
     config_path = (config_dir / "mkchromecast_beta.cfg").expanduser()
 
-    print(f":::config::: WARNING: USING BETA CONFIG PATH: {config_path}")
+    global _warned_about_beta_path
+    if not _warned_about_beta_path:
+        _warned_about_beta_path = True
+        print(f":::config::: WARNING: USING BETA CONFIG PATH: {config_path}")
+
     return config_path
 
 
@@ -111,7 +120,8 @@ class Config:
     def _update_any_missing_values(self) -> None:
         """Sets any missing values to their defaults."""
         if not self._config.has_section(SETTINGS):
-            print(f":::config::: Creating missing section '{SETTINGS}'")
+            if self._debug:
+                print(f":::config::: Creating missing section '{SETTINGS}'")
             self._config.add_section(SETTINGS)
 
         expected_keys = self._default_conf.keys()
@@ -129,8 +139,9 @@ class Config:
 
         if missing_keys:
             if self._read_only:
-                print(":::config::: Missing keys _not_ being saved for "
-                      "read-only config")
+                if self._debug:
+                    print(":::config::: Missing keys _not_ being saved for "
+                          "read-only config")
             else:
                 if self._debug:
                     print(":::config::: Re-writing config to add missing keys: "
