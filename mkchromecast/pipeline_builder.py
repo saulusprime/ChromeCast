@@ -137,11 +137,21 @@ class Audio:
                 "pipe:",
         ]
 
+    @staticmethod
+    def _lame_input_rate(samplerate: str) -> str:
+        """Formats a sample rate for lame -s, which expects kHz."""
+        khz = int(samplerate) / 1000
+        return f"{khz:g}"
+
     def _build_linux_other_command(self) -> list[str]:
+        # These encoders read headerless PCM, so each one has to be told the
+        # input sample rate explicitly.  Leaving it out made them assume
+        # 44100Hz and mislabel or resample anything else.
         if self._settings.codec == "mp3":
             return ["lame",
                     "-b", str(self._settings.bitrate),
                     "-r",
+                    "-s", self._lame_input_rate(self._settings.samplerate),
                     "-"]
 
         if self._settings.codec == "ogg":
@@ -149,6 +159,7 @@ class Audio:
                     "-b", str(self._settings.bitrate),
                     "-Q",
                     "-r",
+                    "--raw-rate", self._settings.samplerate,
                     "--ignorelength",
                     "-"]
 
@@ -161,6 +172,7 @@ class Audio:
                     "-b", str(self._settings.bitrate),
                     "-X",
                     "-P",
+                    "-R", self._settings.samplerate,
                     "-c", "18000",
                     "-o", "-",
                     "-"]

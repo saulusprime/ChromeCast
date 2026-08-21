@@ -188,7 +188,16 @@ class FlaskServer:
             and FlaskServer._backend.name == "parec"
             and FlaskServer._backend.path is not None
         ):
-            c_parec = [FlaskServer._backend.path, "--format=s16le", "-d", "Mkchromecast.monitor"]
+            # parec negotiates 44100Hz unless told otherwise, so without
+            # --rate its output silently disagreed with whatever rate we
+            # then declared to the encoder.
+            c_parec = [
+                FlaskServer._backend.path,
+                "--format=s16le",
+                f"--rate={FlaskServer._samplerate}",
+                "--channels=2",
+                "-d", "Mkchromecast.monitor",
+            ]
             parec = Popen(c_parec, stdout=PIPE)
 
             try:

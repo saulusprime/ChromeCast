@@ -1,5 +1,6 @@
 # this file is part of mkchromecast.
 
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -195,6 +196,36 @@ class AudioBuilderTests(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "unexpected codec.*noexist"):
             _ = self.create_builder("parec", "Linux", codec="noexist").command
+
+    def testLinuxOtherSampleRate(self):
+        """Every raw-PCM encoder must be told the input sample rate.
+
+        parec emits headerless PCM at whatever rate we ask it for, so an
+        encoder left to its 44100Hz default would mislabel or resample the
+        stream.
+        """
+        # lame takes kHz; everything else takes Hz.
+        expected_rate_arg: dict[str, str] = {
+            "mp3": "48",
+            "ogg": "48000",
+            "aac": "48000",
+            "opus": "48000",
+            "wav": "48000",
+            "flac": "48000",
+        }
+
+        for codec, rate_arg in expected_rate_arg.items():
+            command = self.create_builder(
+                "parec", "Linux", codec=codec, samplerate="48000").command
+            self.assertIn(
+                rate_arg, command,
+                f"Sample rate missing from {codec} command: {command}")
+
+    def testLameInputRateIsKilohertz(self):
+        to_khz = pipeline_builder.Audio._lame_input_rate
+        self.assertEqual("44.1", to_khz("44100"))
+        self.assertEqual("48", to_khz("48000"))
+        self.assertEqual("22.05", to_khz("22050"))
 
 
 class VideoBuilderTests(unittest.TestCase):
