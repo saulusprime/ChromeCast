@@ -42,6 +42,10 @@ except ImportError:
     has_chromecast = False
 
 
+# How many times the user may retype a device index before we give up.
+SELECTION_ATTEMPTS = 3
+
+
 class CastError(Exception):
     """Raised when casting cannot proceed, with a user-facing message.
 
@@ -199,38 +203,74 @@ class Casting:
             + colors.important("Index")
             + " of the Google Cast device that you want to use:"
         )
-        self.index = input()
+        try:
+            self.index = input()
+        except EOFError:
+            # Nobody is there to answer: -s was asked for with a standard input
+            # that is closed or exhausted.
+            print(" ")
+            print(colors.error(
+                "No index was given: standard input is closed."))
+            terminate(1)
+
+    def _write_index_to_pickle(self) -> None:
+        """Records the chosen index where the tray and later runs look for it."""
+        previous = getattr(self, "tf", None)
+        if previous is not None and not previous.closed:
+            previous.close()
+
+        checkmktmp()
+        self.tf = open("/tmp/mkchromecast.tmp", "wb")
+        pickle.dump(self.index, self.tf)
+        self.tf.close()
+
+    def _device_for_index(self) -> Optional[str]:
+        """Returns the device self.index refers to, or None if it refers to none.
+
+        Anything that is not a plain number within the range of the listed
+        devices counts as no selection: negative indexes are rejected too, since
+        "-1" reads as a mistake rather than as a request for the last device.
+        """
+        try:
+            index = int(self.index)
+        except (TypeError, ValueError):
+            return None
+
+        if not 0 <= index < len(self.cclist):
+            return None
+
+        return self.cclist[index][1]
 
     def input_device(self, write_to_pickle=True):
-        while True:
-            try:
+        """Turns the index typed by the user into the device to cast to.
+
+        A bogus index costs an attempt and a fresh prompt; running out of
+        attempts ends the application, as does a closed stdin (handled by
+        select_a_device, which is where the reading happens).
+        """
+        for attempts_left in reversed(range(SELECTION_ATTEMPTS)):
+            cast_to = self._device_for_index()
+            if cast_to is not None:
+                self.cast_to = cast_to
                 if write_to_pickle:
-                    pickle.dump(self.index, self.tf)
-                    self.tf.close()
-                self.cast_to = self.cclist[int(self.index)][1]
+                    self._write_index_to_pickle()
                 print(" ")
                 print(
                     colors.options("Casting to:") + " " + colors.success(self.cast_to)
                 )
                 print(" ")
-            except TypeError:
-                print(
-                    colors.options("Casting to:")
-                    + " "
-                    + colors.success(self.cast_to.player_name)
-                )
-            except IndexError:
-                checkmktmp()
-                self.tf = open("/tmp/mkchromecast.tmp", "wb")
-                # TODO(xsdg): The original code had what was likely a typo here,
-                # in that this called `self.select_device()`, which did not
-                # exist.  It likely was supposed to be `self.select_a_device()`,
-                # but it's better to just start over, here.
-                raise Exception(
-                    "Internal error: Never worked; needs to be fixed.")
-                self.mkcc.select_device()
-                continue
-            break
+                return
+
+            print(colors.error(
+                f"{self.index!r} is not one of the indexes listed above."))
+
+            if not attempts_left:
+                break
+
+            self.select_a_device()
+
+        print(colors.error("No device was selected."))
+        terminate(1)
 
     def get_devices(self):
         if self.mkcc.debug is True:
