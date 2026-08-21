@@ -1,4 +1,3 @@
-PyGObject
 requests
 psutil
 Flask
@@ -6,3 +5,11 @@ netifaces
 pychromecast>=14,<15
 PyQt5
 soco
+
+# Optional: desktop notifications on Linux (see systray.linux_notify).
+# Building the wheel needs system packages that are not installed by
+# default on Ubuntu:
+#     sudo apt install libgirepository-2.0-dev libcairo2-dev
+# Or use the distro package instead, by creating the venv with:
+#     python3 -m venv --system-site-packages .venv
+# PyGObject

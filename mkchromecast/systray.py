@@ -36,6 +36,36 @@ except ImportError:
     chromecast = False
 
 
+def linux_notify(message: str) -> None:
+    """Shows a desktop notification through libnotify, when it is available.
+
+    PyGObject is an optional dependency, and the Notify typelib version varies
+    across distros, so every failure here is non-fatal: we just skip the
+    notification.
+    """
+    try:
+        import gi
+    except ImportError:
+        print("If you want to receive notifications in Linux, install "
+              "libnotify and python-gobject.")
+        return
+
+    try:
+        # Recent distros ship Notify 0.8; older ones only have 0.7.
+        try:
+            gi.require_version("Notify", "0.8")
+        except ValueError:
+            gi.require_version("Notify", "0.7")
+        from gi.repository import Notify
+    except (ImportError, ValueError) as e:
+        print(f"Desktop notifications are unavailable: {e}")
+        return
+
+    Notify.init("Mkchromecast")
+    Notify.Notification.new(
+        "Mkchromecast", message, "dialog-information").show()
+
+
 # TODO(xsdg): Encapsulate this so that we don't do this work on import.
 _mkcc = mkchromecast.Mkchromecast()
 
@@ -309,24 +339,7 @@ class menubar(QtWidgets.QMainWindow):
                 if _mkcc.debug is True:
                     print(":::systray:::", found)
             elif _mkcc.platform == "Linux" and self.config.notifications:
-                try:
-                    import gi
-
-                    gi.require_version("Notify", "0.7")
-                    from gi.repository import Notify
-
-                    Notify.init("Mkchromecast")
-                    found = Notify.Notification.new(
-                        "Mkchromecast",
-                        "Media Streaming Devices Found!",
-                        "dialog-information",
-                    )
-                    found.show()
-                except ImportError:
-                    print(
-                        "If you want to receive notifications in Linux, "
-                        "install libnotify and python-gobject"
-                    )
+                linux_notify("Media Streaming Devices Found!")
             self.menu.clear()
             self.search_menu()
             self.separator_menu()
@@ -462,29 +475,10 @@ class menubar(QtWidgets.QMainWindow):
                     print(":::systray::: stop", stop)
 
             elif _mkcc.platform == "Linux" and self.config.notifications:
-                try:
-                    import gi
-
-                    gi.require_version("Notify", "0.7")
-                    from gi.repository import Notify
-
-                    Notify.init("Mkchromecast")
-                    if self.pcastfailed is True:
-                        stop = Notify.Notification.new(
-                            "Mkchromecast",
-                            "Streaming Process Failed. Try Again...",
-                            "dialog-information",
-                        )
-                    else:
-                        stop = Notify.Notification.new(
-                            "Mkchromecast", "Streaming Stopped!", "dialog-information"
-                        )
-                    stop.show()
-                except ImportError:
-                    print(
-                        "If you want to receive notifications in Linux, "
-                        "install  libnotify and python-gobject"
-                    )
+                if self.pcastfailed is True:
+                    linux_notify("Streaming Process Failed. Try Again...")
+                else:
+                    linux_notify("Streaming Stopped!")
 
     def volume_cast(self):
         self.sl = QtWidgets.QSlider(Qt.Horizontal)
@@ -700,24 +694,7 @@ class menubar(QtWidgets.QMainWindow):
             if _mkcc.debug is True:
                 print(":::systray:::", searching)
         elif _mkcc.platform == "Linux" and self.config.notifications:
-            try:
-                import gi
-
-                gi.require_version("Notify", "0.7")
-                from gi.repository import Notify
-
-                Notify.init("Mkchromecast")
-                found = Notify.Notification.new(
-                    "Mkchromecast",
-                    "Searching for Media Streaming Devices...",
-                    "dialog-information",
-                )
-                found.show()
-            except ImportError:
-                print(
-                    "If you want to receive notifications in Linux, "
-                    "install libnotify and python-gobject."
-                )
+            linux_notify("Searching for Media Streaming Devices...")
 
 
 def main():
