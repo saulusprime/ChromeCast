@@ -10,6 +10,9 @@ from mkchromecast import colors
 from mkchromecast import config
 from mkchromecast import node
 from mkchromecast.audio_devices import inputdev, outputdev
+# Imported directly: the `cast` global below gets rebound to a Chromecast
+# instance, so `cast.CastError` is not reliable inside _play_cast_.
+from mkchromecast.cast import CastError
 from mkchromecast.constants import OpMode
 from mkchromecast.pulseaudio import create_sink, check_sink
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
@@ -81,7 +84,9 @@ class Player(QObject):
                 inputdev()
                 outputdev()
             self.pcastready.emit("_play_cast_ success")
-        except AttributeError:
+        except (AttributeError, CastError) as e:
+            if _mkcc.debug is True:
+                print(colors.warning(f":::Threading::: play_cast failed: {e}"))
             self.pcastready.emit("_play_cast_ failed")
         self.pcastfinished.emit()
 

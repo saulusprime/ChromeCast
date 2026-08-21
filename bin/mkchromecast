@@ -285,4 +285,8 @@ if __name__ == "__main__":
     mkcc = mkchromecast.Mkchromecast()
     maybe_execute_single_action(mkcc)
 
-    CastProcess(mkcc).run()
+    try:
+        CastProcess(mkcc).run()
+    except cast.CastError as e:
+        print(colors.error(str(e)))
+        sys.exit(1)

@@ -42,6 +42,14 @@ except ImportError:
     has_chromecast = False
 
 
+class CastError(Exception):
+    """Raised when casting cannot proceed, with a user-facing message.
+
+    Callers decide how to react: the CLI exits, while the system tray and the
+    hijack loop just mark the attempt as failed and stay alive.
+    """
+
+
 @dataclasses.dataclass
 class AvailableDevice:
     index: int
@@ -322,21 +330,41 @@ class Casting:
         else:
             play_url = f"http://{localip}:{self.mkcc.port}/stream"
 
+        # The device may already be running another app (screen mirroring,
+        # another sender, ...).  Hand the receiver back to us first, otherwise
+        # the load below lands in a session we don't control.
+        if self.cast.app_id not in (None, pychromecast.IDLE_APP_ID):
+            if self.mkcc.debug is True:
+                print(f"Quitting app already running on device: "
+                      f"{self.cast.app_id}")
+            self.cast.quit_app()
+            self.cast.wait(timeout=10)
+
         media_controller.play_media(
             play_url, media_type, title=self.title, stream_type="LIVE",
         )
 
-        if media_controller.is_active:
+        # play_media is asynchronous and does not wait for the receiver to
+        # open a media session.  Since pychromecast 9, playback commands raise
+        # RequestFailed when no session is active, so we wait for one instead
+        # of sleeping and hoping.
+        media_controller.block_until_active(timeout=15.0)
+        if not media_controller.is_active:
+            raise CastError(
+                "The cast device did not start a media session. Check that "
+                f"{play_url} is reachable from the device's network.")
+
+        try:
             media_controller.play()
+        except pychromecast.error.RequestFailed as e:
+            raise CastError(
+                f"The cast device rejected the play command: {e}") from e
 
         print(" ")
         print(colors.important("Cast media controller status"))
         print(" ")
         print(self.cast.status)
         print(" ")
-
-        time.sleep(5.0)
-        media_controller.play()
 
         if self.mkcc.hijack is True:
             self.r = Thread(target=self.hijack_cc)
@@ -437,7 +465,7 @@ class Casting:
                 self.mkcc.device_name = self.cast_to
                 self.get_devices()
                 self.play_cast()
-            except AttributeError:
+            except (AttributeError, CastError):
                 pass
 
 
