@@ -18,6 +18,14 @@ from mkchromecast import utils
 from mkchromecast.constants import OpMode
 import mkchromecast.messages as msg
 
+# The macOS .app bundle is launched with a minimal PATH that does not include
+# Homebrew, so on Darwin we look there too before giving up.  On Linux we
+# deliberately honour only the user's PATH.
+DARWIN_EXTRA_BACKEND_PATH = (
+    "./bin:./nodejs/bin:/usr/local/bin:/usr/local/sbin:/opt/homebrew/bin:"
+    "/opt/X11/bin:/usr/X11/bin"
+)
+
 
 backend = stream_infra.BackendInfo()
 
@@ -74,27 +82,18 @@ if _mkcc.operation == OpMode.YOUTUBE:
     media_type = "audio/mp4"
 else:
     backend.name = _mkcc.backend
-    backend.path = backend.name    
 
-    # TODO(xsdg): Why is this only run in tray mode???
-    if _mkcc.operation == OpMode.TRAY and backend.name in {"ffmpeg", "parec"}:
-        import os
-        import getpass
+    # Resolve through the user's PATH in every mode.  This used to run only in
+    # tray mode; everywhere else backend.path was left as the bare name, and a
+    # backend that could not be found surfaced much later as an encoder
+    # started with no input.
+    backend.path = shutil.which(backend.name)
+    if backend.path is None and platform == "Darwin":
+        backend.path = shutil.which(backend.name,
+                                    path=DARWIN_EXTRA_BACKEND_PATH)
 
-        # TODO(xsdg): We should not be setting up a custom path like this.  We
-        # should be respecting the path that the user has set, and requiring
-        # them to specify an absolute path if the backend isn't in their PATH.
-        username = getpass.getuser()
-        backend_search_path = (
-            f"./bin:./nodejs/bin:/Users/{username}/bin:/usr/local/bin:"
-            "/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:"
-            f"/usr/X11/bin:/usr/games:{os.environ['PATH']}"
-        )
-
-        backend.path = shutil.which(backend.name, path=backend_search_path)
-        if debug:
-            print(f"Searched for {backend.name} in PATH {backend_search_path}")
-            print(f"Resolved to {repr(backend.path)}")
+    if debug:
+        print(f"Resolved backend {backend.name} to {repr(backend.path)}")
 
     if encode_settings.codec == "mp3":
         media_type = "audio/mpeg"
@@ -142,6 +141,13 @@ def _flask_init():
 
 def main() -> bool:
     """Starts the streaming server.  Returns whether it came up."""
+    if backend.name is not None and backend.path is None:
+        print(colors.error(
+            f"Could not find the {backend.name!r} backend on your PATH."))
+        print(colors.options("Hint:")
+              + " install it, or pick another one with --encoder-backend.")
+        return False
+
     pipeline = stream_infra.PipelineProcess(_flask_init, ip, port, platform)
     pipeline.start()
     if not pipeline.wait_until_serving():

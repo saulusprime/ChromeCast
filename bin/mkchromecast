@@ -3,8 +3,8 @@
 # This file is part of mkchromecast.
 import atexit
 import os
+import psutil
 import signal
-import subprocess
 import sys
 from typing import List, Optional
 
@@ -262,27 +262,32 @@ class CastProcess(object):
             print(colors.error('Quitting application...'))
             self.terminate_app()
 
+    # Process names to signal for each backend.  The encoder runs inside the
+    # streaming process, so it is a descendant of ours rather than a direct
+    # child.
+    _ENCODER_PROCESS_NAMES = {
+        'ffmpeg': {'ffmpeg'},
+        'node': {'node', 'nodejs'},
+    }
+
     def backend_handler(self, action, backend):
-        """Methods to handle pause and resume state of backends"""
-        # TODO(xsdg): Woah, this isn't right.  We should specifically only
-        # send signals to processes that are our children (and we should do so
-        # by using the Popen library, and not by shelling out to pkill).
-        if action == 'pause' and backend == 'ffmpeg':
-            subprocess.call(['pkill', '-STOP', '-f', 'ffmpeg'])
-        elif action == 'resume' and backend == 'ffmpeg':
-            subprocess.call(['pkill', '-CONT', '-f', 'ffmpeg'])
-        elif (action == 'pause' and backend == 'node' and
-              self.mkcc.platform == 'Linux'):
-            subprocess.call(['pkill', '-STOP', '-f', 'nodejs'])
-        elif (action == 'resume' and backend == 'node' and
-              self.mkcc.platform == 'Linux'):
-            subprocess.call(['pkill', '-CONT', '-f', 'nodejs'])
-        elif (action == 'pause' and backend == 'node' and
-              self.mkcc.platform == 'Darwin'):
-            subprocess.call(['pkill', '-STOP', '-f', 'node'])
-        elif (action == 'resume' and backend == 'node' and
-              self.mkcc.platform == 'Darwin'):
-            subprocess.call(['pkill', '-CONT', '-f', 'node'])
+        """Pauses or resumes the encoder, then the cast device."""
+        # This used to shell out to `pkill -f ffmpeg`, which stopped every
+        # ffmpeg the user happened to be running, ours or not.
+        signal_for_action = {
+            'pause': signal.SIGSTOP,
+            'resume': signal.SIGCONT,
+        }
+        to_send = signal_for_action.get(action)
+        target_names = self._ENCODER_PROCESS_NAMES.get(backend, set())
+
+        if to_send is not None and target_names:
+            for proc in psutil.Process(os.getpid()).children(recursive=True):
+                try:
+                    if proc.name() in target_names:
+                        proc.send_signal(to_send)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
 
         if action == 'pause':
             self.cc.pause()
