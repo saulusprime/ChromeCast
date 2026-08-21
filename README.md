@@ -14,7 +14,7 @@ Mkchromecast
 [![GitHub release](https://img.shields.io/github/release/muammar/mkchromecast.svg)](https://github.com/muammar/mkchromecast/releases/latest)
 
 This is a program to cast your **macOS** audio, or **Linux** audio to your
-Google Cast devices or Sonos speakers. It can also [cast video files](#video).
+Google Cast devices. It can also [cast video files](#video).
 
 It is written for Python3, and it can stream via `node.js`, `parec` (**Linux**),
 or `ffmpeg`.  **Mkchromecast** is capable of using lossy and lossless audio
@@ -71,13 +71,14 @@ Check these images:
 Sonos support
 --------------
 
-If you have Sonos speakers, you can play whatever you are listening to in your
-computer with **Mkchromecast**. To add Sonos support, install the `soco` python
-module:
+**Sonos casting is currently not available.** The code that drove Sonos
+speakers was moved aside during a refactor and never reconnected: it lives on
+in `mkchromecast/cast.py` as `_DisabledSonosCasting`, which nothing
+instantiates and whose `play_cast()` raises before it reaches the speaker.
+Selecting a Sonos device is not offered anywhere in the interface.
 
-```
-pip3 install soco
-```
+The `soco` dependency is kept so that whoever revives that class has the
+library at hand.  Reviving it is tracked in [TO-DO.md](TO-DO.md).
 
 Contribute
 ----------
@@ -130,7 +131,8 @@ following:
 * PyQt5 (optional if you want to use the system tray menu).
 * yt-dlp (option if you plan to cast youtube URLs or [supported
   websites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)).
-* soco (this module adds Sonos support to Mkchromecast).
+* soco (kept for the Sonos code that is currently disabled; see [Sonos
+  support](#sonos-support)).
 
 For those who don't like Pulseaudio, it is possible to [cast using
 ALSA](https://github.com/muammar/mkchromecast/wiki/ALSA). In that case the
@@ -153,7 +155,8 @@ requirements are:
 * PyQt5 (optional if you want to use the system tray menu).
 * yt-dlp (option if you plan to cast youtube URLs or [supported
   websites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)).
-* soco (this module adds Sonos support to Mkchromecast).
+* soco (kept for the Sonos code that is currently disabled; see [Sonos
+  support](#sonos-support)).
 
 
 Install
@@ -693,9 +696,9 @@ Known issues
   versions of pychromecast.
 * When casting videos using the `node` backend, it is not possible to
   use neither the `--subtitle` nor the `--seek` flags.
-* When casting to Sonos the only codecs supported are: `mp3`, and `aac`.
-  I won't give `wma` support. Apparently there is a way to play `wav`, and
-  `ogg` that I will try to implement later.
+* Sonos casting does not work at all: see [Sonos support](#sonos-support).
+  Should it come back, the only codecs it supported were `mp3` and `aac`;
+  `wma` will not be supported.
 
 ##### macOS
 
@@ -718,5 +721,6 @@ TODO
 ----
 
 * Verify all exceptions when the system tray menu fails.
+* **Sonos**: reconnect `_DisabledSonosCasting` so speakers can be driven again.
 * **Sonos**: add support to different available flags.
 * **Sonos**: add Equalizer in the controls.

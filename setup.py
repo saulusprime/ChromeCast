@@ -87,7 +87,7 @@ OPTIONS = {
     "plist": {
         "CFBundleName": APP_NAME,
         "CFBundleDisplayName": APP_NAME,
-        "CFBundleGetInfoString": "Cast macOS audio to your Google cast devices and Sonos speakers",
+        "CFBundleGetInfoString": "Cast macOS audio to your Google cast devices",
         "CFBundleIdentifier": "com.mkchromecast.osx",
         "CFBundleVersion": __version__,
         "CFBundleShortVersionString": __version__,

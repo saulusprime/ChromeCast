@@ -520,10 +520,13 @@ def ping_chromecast(ip):
 
 
 class _DisabledSonosCasting:
-    """Half-hearted attempt at refactoring Sonos support into its own class.
+    """Sonos support, moved aside during a refactor and never reconnected.
 
-    This is broken, but should simplify the Chromecast support code until the
-    Sonos support can be unbroken at some later point.
+    Nothing instantiates this class, so Sonos casting is not available at all:
+    play_cast() raises before it reaches the speaker, and no code path offers a
+    Sonos device to select.  It is kept so that the original behaviour is still
+    on record for whoever restores it; the README says as much rather than
+    advertising a feature that is not there.
     """
 
     def __init__(self, mkcc: mkchromecast.Mkchromecast):

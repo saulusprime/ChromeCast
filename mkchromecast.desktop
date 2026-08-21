@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=mkchromecast
-Comment=Cast your Linux audio or video files to your Google cast or Sonos devices
+Comment=Cast your Linux audio or video files to your Google cast devices
 Exec=/usr/bin/mkchromecast -t
 Terminal=false
 Type=Application
