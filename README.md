@@ -331,6 +331,32 @@ sudo apt install python3-gi
 python3 -m venv --system-site-packages .venv
 ```
 
+##### Building from the working tree (Linux)
+
+The `Makefile` carries Linux targets alongside the macOS ones; `make` on its
+own lists them. They assume a virtualenv in `.venv` (override with
+`make PYTHON=...`), and they refuse to run on the wrong platform rather than
+doing something surprising.
+
+```
+make check      # run the test suite
+make wheel      # dist/mkchromecast-X.Y.Z-py3-none-any.whl
+make binary     # dist/mkchromecast, a single standalone executable
+make install    # install into the virtualenv
+make develop    # same, editable
+make run ARGS="--discover"
+make clean-build
+```
+
+`make binary` uses [PyInstaller](https://pyinstaller.org) (`pip install
+pyinstaller`) and produces one file, around 63 MB, that carries its own Python
+interpreter, PyQt5 and every other Python dependency: it runs without the
+virtualenv, from any directory.
+
+It does **not** carry the external programs Mkchromecast drives -- `parec`,
+`pactl`, `ffmpeg`, `lame` and the other encoders still have to come from the
+distribution, as listed above.
+
 ##### BlackHole (macOS users only)
 
 For installing BlackHole you can check
