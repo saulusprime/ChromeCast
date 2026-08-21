@@ -64,7 +64,10 @@ class Player(QObject):
                     from importlib import reload
 
                     reload(mkchromecast.audio)
-                mkchromecast.audio.main()
+                if not mkchromecast.audio.main():
+                    self.pcastready.emit("_play_cast_ failed")
+                    self.pcastfinished.emit()
+                    return
         if _mkcc.platform == "Linux":
             # We create the sink only if it is not available
             if check_sink() is False and _mkcc.adevice is None:

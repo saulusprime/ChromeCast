@@ -20,7 +20,8 @@ from mkchromecast import cast
 from mkchromecast import colors
 from mkchromecast.constants import OpMode
 from mkchromecast.pulseaudio import create_sink, get_sink_list, remove_sink
-from mkchromecast.utils import terminate, checkmktmp, writePidFile
+from mkchromecast.utils import (checkmktmp, del_tmp, kill_children,
+                               terminate, writePidFile)
 
 
 def maybe_execute_single_action(mkcc: mkchromecast.Mkchromecast):
@@ -48,6 +49,7 @@ class CastProcess(object):
     def __init__(self, mkcc: mkchromecast.Mkchromecast):
         print(colors.bold('Mkchromecast ') + 'v' + __version__)
         self.mkcc = mkcc
+        self._cleaned_up = False
 
         # Type declarations
         self.cc: cast.Casting
@@ -91,7 +93,9 @@ class CastProcess(object):
             mkchromecast.node.stream_audio()
         else:
             import mkchromecast.audio
-            mkchromecast.audio.main()
+            if not mkchromecast.audio.main():
+                # atexit runs terminate_app, which removes the sink.
+                raise SystemExit(1)
         print(colors.success('[Done]'))
 
         self.cc.initialize_cast()
@@ -114,7 +118,8 @@ class CastProcess(object):
 
     def start_youtube(self):
         import mkchromecast.audio
-        mkchromecast.audio.main()
+        if not mkchromecast.audio.main():
+            raise SystemExit(1)
         self.cc.initialize_cast()
         self.get_devices(self.mkcc.select_device)
         self.cc.play_cast()
@@ -131,7 +136,8 @@ class CastProcess(object):
 
         print(colors.important('Starting Video Cast Process...'))
         import mkchromecast.video
-        mkchromecast.video.main()
+        if not mkchromecast.video.main():
+            raise SystemExit(1)
         self.cc.initialize_cast()
         self.get_devices(self.mkcc.select_device)
         self.cc.play_cast()
@@ -154,10 +160,19 @@ class CastProcess(object):
         if self.cc.ip == '127.0.0.1':        # We verify the local IP.
             print(colors.error('Your Computer is not Connected to Any '
                   'Network'))
-            terminate()
+            terminate(1)
 
     def terminate_app(self):
-        """Terminate the app (kill app)"""
+        """Releases the cast device, audio devices and child processes.
+
+        Registered with atexit, so it must return rather than exiting: that
+        way the interpreter keeps whatever exit status was already set.  It is
+        also called directly on Ctrl-C, hence the idempotence guard.
+        """
+        if self._cleaned_up:
+            return
+        self._cleaned_up = True
+
         if self.mkcc.debug:
             print(f'terminate_app running in pid {os.getpid()}')
 
@@ -167,7 +182,9 @@ class CastProcess(object):
             outputint()
         elif self.mkcc.platform == 'Linux':
             remove_sink()
-        terminate()  # Does not return.
+
+        del_tmp()
+        kill_children()
 
     def print_controls_msg(self):
         """Messages shown when controls is True"""

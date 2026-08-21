@@ -48,7 +48,8 @@ def _flask_init():
     )
 
 
-def main():
+def main() -> bool:
+    """Starts the video streaming server.  Returns whether it came up."""
     mkcc = mkchromecast.Mkchromecast()
     ip = utils.get_effective_ip(
         mkcc.platform, host_override=mkcc.host, fallback_ip="0.0.0.0")
@@ -58,7 +59,9 @@ def main():
         pipeline.start()
         if not pipeline.wait_until_serving():
             print(colors.error("The streaming server failed to start."))
-            utils.terminate()
+            return False
+
+        return True
     else:
         print("Starting Node")
 
@@ -69,7 +72,7 @@ def main():
             print(colors.warning(
                 "The node video backend requires and only supports the input "
                 "file operation (-i argument)."))
-            utils.terminate()
+            return False
 
         if mkcc.platform == "Darwin":
             PATH = (
@@ -114,4 +117,6 @@ def main():
                 )
             )
             print(colors.warning("Closing the application..."))
-            utils.terminate()
+            return False
+
+        return True

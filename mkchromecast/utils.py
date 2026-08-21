@@ -6,6 +6,7 @@ import pickle
 import psutil
 import socket
 import subprocess
+import sys
 from typing import List, Optional
 from urllib.parse import urlparse
 
@@ -124,13 +125,45 @@ def clamp_bitrate(codec: str, bitrate: Optional[int]) -> int:
     return bitrate
 
 
-def terminate() -> None:
+def kill_children() -> None:
+    """Stops our child processes, escalating to SIGKILL only if needed."""
+    parent = psutil.Process(os.getpid())
+    children = parent.children(recursive=True)
+
+    for child in children:
+        try:
+            child.terminate()
+        except psutil.NoSuchProcess:
+            pass
+
+    _, still_alive = psutil.wait_procs(children, timeout=3)
+    for child in still_alive:
+        try:
+            child.kill()
+        except psutil.NoSuchProcess:
+            pass
+
+
+def terminate(exit_code: int = 0) -> None:
+    """Kills our children and exits the process.  Does not return.
+
+    We exit via os._exit rather than sys.exit because this is also called
+    from non-main threads, where sys.exit would unwind only that thread.
+    That skips atexit handlers, so callers are responsible for any
+    application-level cleanup (removing sinks, restoring audio devices)
+    beforehand.
+
+    The previous implementation SIGKILLed its own process, which discarded
+    whatever was still sitting in stdout's buffer.  Anything printed before
+    terminate() was therefore lost whenever output was redirected, and the
+    exit status was always 137.
+    """
     del_tmp()
-    parent_pid = os.getpid()
-    parent = psutil.Process(parent_pid)
-    for child in parent.children(recursive=True):
-        child.kill()
-    parent.kill()
+    kill_children()
+
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(exit_code)
 
 
 def del_tmp(debug: bool = False) -> None:

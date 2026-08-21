@@ -187,8 +187,7 @@ class Casting:
             elif self.mkcc.platform == "Darwin":
                 inputint()
                 outputint()
-            terminate()
-            exit()
+            terminate(1)
 
         elif len(self.cclist) == 0 and self.mkcc.operation == OpMode.TRAY:
             print(colors.error(":::Tray::: No devices found!"))
@@ -256,8 +255,7 @@ class Casting:
                 return
 
             print(colors.error("Finishing the application..."))
-            terminate()
-            exit()
+            terminate(1)
 
         self.cast = self._chromecasts_by_name[self.cast_to]
         # Wait for cast device to be ready
@@ -595,8 +593,7 @@ class _DisabledSonosCasting:
             elif self.mkcc.platform == "Darwin":
                 inputint()
                 outputint()
-            terminate()
-            exit()
+            terminate(1)
 
         elif len(self.cclist) == 0 and self.mkcc.operation == OpMode.TRAY:
             print(colors.error(":::Tray::: No devices found!"))

@@ -140,9 +140,12 @@ def _flask_init():
         samplerate=encode_settings.samplerate)
 
 
-def main():
+def main() -> bool:
+    """Starts the streaming server.  Returns whether it came up."""
     pipeline = stream_infra.PipelineProcess(_flask_init, ip, port, platform)
     pipeline.start()
     if not pipeline.wait_until_serving():
         print(colors.error("The streaming server failed to start."))
-        utils.terminate()
+        return False
+
+    return True
