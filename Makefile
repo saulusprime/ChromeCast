@@ -2,9 +2,9 @@
 #
 # Two sets of targets live here, and they do not mix:
 #
-#   Linux  -- run the tests, build a wheel, build a standalone binary, and
+#   Linux  -- run the tests, build a wheel, a .deb or a standalone binary, and
 #             install into the virtualenv:
-#                 make check wheel binary install develop uninstall run
+#                 make check wheel deb binary install develop uninstall run
 #
 #   macOS  -- build the .app bundle with py2app.  These targets rewrite
 #             mkchromecast/__init__.py in place to force the tray on, and
@@ -27,6 +27,15 @@
 #     pactl, ffmpeg, lame and friends still have to come from the
 #     distribution.  See the dependency list in README.md.
 #
+# What "deb" builds
+# =================
+#     make deb  ->  dist/mkchromecast_X.Y.Z-1local1_all.deb, a package for the
+#                   system Python that depends on the distribution's python3-*
+#                   packages.  This is the only build that can replace the
+#                   distribution's own /usr/bin/mkchromecast.
+#
+#     See packaging/build-deb.sh for what goes in it and why.
+#
 # Muammar El Khatib
 #
 
@@ -48,6 +57,7 @@ ARGS ?=
         require-darwin \
         check \
         wheel \
+        deb \
         binary \
         install \
         develop \
@@ -68,6 +78,7 @@ help:
 	@echo "Linux:"
 	@echo "  check        run the unit test suite"
 	@echo "  wheel        build $(DISTDIR)/mkchromecast-*.whl"
+	@echo "  deb          build $(DISTDIR)/mkchromecast_*_all.deb"
 	@echo "  binary       build $(DISTDIR)/mkchromecast, a standalone executable"
 	@echo "  install      install into the virtualenv"
 	@echo "  develop      install into the virtualenv, editable"
@@ -100,6 +111,11 @@ check: require-linux
 
 wheel: require-linux
 	$(PIP) wheel . --no-deps -w $(DISTDIR)
+
+# Built with dpkg-deb rather than debhelper, so it needs nothing beyond
+# dpkg-dev.  DEB_REVISION overrides the Debian revision.
+deb: require-linux
+	packaging/build-deb.sh $(DISTDIR)
 
 # The entry point puts the repo root on sys.path at runtime, which is too late
 # for PyInstaller to follow: --paths says where the package is.  Most of the

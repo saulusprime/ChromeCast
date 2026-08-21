@@ -341,6 +341,7 @@ doing something surprising.
 ```
 make check      # run the test suite
 make wheel      # dist/mkchromecast-X.Y.Z-py3-none-any.whl
+make deb        # dist/mkchromecast_X.Y.Z-1local1_all.deb
 make binary     # dist/mkchromecast, a single standalone executable
 make install    # install into the virtualenv
 make develop    # same, editable
@@ -356,6 +357,21 @@ virtualenv, from any directory.
 It does **not** carry the external programs Mkchromecast drives -- `parec`,
 `pactl`, `ffmpeg`, `lame` and the other encoders still have to come from the
 distribution, as listed above.
+
+`make deb` builds a package for the **system** Python, depending on the
+distribution's `python3-*` packages rather than on `requirements.txt`. It is
+the only build that can replace the distribution's own
+`/usr/bin/mkchromecast`:
+
+```
+make deb
+sudo apt install ./dist/mkchromecast_0.3.9-1local1_all.deb
+```
+
+The default revision, `1local1`, sorts above the packaged version, so apt
+treats a local build as an upgrade. Override it with
+`make deb DEB_REVISION=...`. It is built with `dpkg-deb`, so it needs nothing
+beyond `dpkg-dev`; see `packaging/build-deb.sh` for what goes in it.
 
 ##### BlackHole (macOS users only)
 
