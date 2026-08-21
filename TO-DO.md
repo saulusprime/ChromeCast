@@ -267,9 +267,14 @@ funzione `_notify(title, message)`.
 
 ---
 
-## 🟠 P1 — Gravi
+## 🟠 P1 — Gravi  ✅ RISOLTI
 
-### #4 — `--reset` non rimuove i sink se il locale non è inglese
+Corretti sul branch `fix/p0-blockers` (commit `6fcb4454`, `7dc8ec28`,
+`53c8b7ee`). Verifica: 35/35 test verdi, `--reset` pulisce i sink in
+locale `it_IT`, `--discover | cat` mostra l'output ed esce 0,
+`--sample-rate 48000` serve davvero uno stream a 48000Hz.
+
+### #4 — `--reset` non rimuove i sink se il locale non è inglese  ✅ `7dc8ec28`
 
 **Sintomo.** I sink `Mkchromecast` si accumulano ad ogni crash e `--reset` non
 li pulisce.
@@ -331,7 +336,7 @@ residui. Applicare `_pactl()` anche a `create_sink`, `remove_sink` e
 
 ---
 
-### #5 — `findall(stringa, re.MULTILINE)` — il flag viene passato come `pos`
+### #5 — `findall(stringa, re.MULTILINE)` — il flag viene passato come `pos`  ✅ `7dc8ec28`
 
 **Causa.** [`pulseaudio.py:94`](mkchromecast/pulseaudio.py#L94):
 
@@ -354,7 +359,7 @@ corretto        findall(s)               : ['536870916']
 
 ---
 
-### #6 — Sample rate incoerente fra `parec` e l'encoder
+### #6 — Sample rate incoerente fra `parec` e l'encoder  ✅ `53c8b7ee`
 
 **Sintomo.** Con `-c opus` l'audio si sente più veloce/acuto (~8.8%). Con
 `-c mp3` l'opzione `--sample-rate` non ha alcun effetto.
@@ -436,7 +441,7 @@ conseguenza.
 
 ---
 
-### #7 — Tutto l'output si perde quando si redirige; exit code sempre 137
+### #7 — Tutto l'output si perde quando si redirige; exit code sempre 137  ✅ `6fcb4454`
 
 **Sintomo.**
 ```console
@@ -573,7 +578,8 @@ già marcata come rotta, ma va sistemato quando la si riabilita.
 
 ## 🔵 P3 — Minori / robustezza
 
-- **`check_sink()` usa le eccezioni come flusso di controllo.**
+- **`check_sink()` ritorna ancora `None` se `pactl` manca.** La gestione a
+  base di `TypeError` è stata rimossa in `7dc8ec28`, ma resta il fatto che
   [`pulseaudio.py:54-75`](mkchromecast/pulseaudio.py#L54-L75) confronta una
   `str` dentro dei `bytes` e si affida al `TypeError` risultante. Decodificare
   una volta sola. Inoltre ritorna `None` se `pactl` non esiste, ma
@@ -672,10 +678,10 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 - [x] #1 Rilevare il fallimento di bind + readiness check (`stream_infra.py`, `audio.py`, `video.py`) — `d059f9d9`
 - [x] #2 `block_until_active()` + `quit_app()` + `try/except RequestFailed` (`cast.py`); pinnare `pychromecast>=14,<15` — `6d97a3de`
 - [x] #3 Rendere `PyGObject` opzionale; gestire `ValueError` su `require_version` (`systray.py`) — `80ffc734`
-- [ ] #4 `LC_ALL=C` + parsing JSON in tutte le chiamate a `pactl` (`pulseaudio.py`)
-- [ ] #5 `findall(testo)` senza il flag come `pos` (`pulseaudio.py:94`)
-- [ ] #6 `--rate` a `parec` + rate di input a `lame`/`oggenc`/`faac`; aggiornare i test
-- [ ] #7 `terminate()` con SIGTERM, flush e `os._exit(0)` (`utils.py`)
+- [x] #4 `LC_ALL=C` + parsing JSON in tutte le chiamate a `pactl` (`pulseaudio.py`) — `7dc8ec28`
+- [x] #5 `findall(testo)` senza il flag come `pos` (`pulseaudio.py:94`) — `7dc8ec28`
+- [x] #6 `--rate` a `parec` + rate di input a `lame`/`oggenc`/`faac`; aggiornare i test — `53c8b7ee`
+- [x] #7 `terminate()` con SIGTERM, flush e `os._exit(0)` (`utils.py`) — `6fcb4454`
 - [ ] #8 Inizializzare `bitrate`/`samplerate` (`node.py`); validare il backend da config (`__init__.py:117`)
 - [ ] #9 `shutil.which("node")` (`node.py:56`)
 - [ ] #10 `cast_info` al posto di `device` (`cast.py`)
