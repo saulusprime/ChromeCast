@@ -1,57 +1,56 @@
 # TO-DO — lavoro rimasto
 
-**Tutti i problemi individuati nell'analisi Ubuntu sono chiusi.** Il registro
-completo, con sintomo, causa, prova raccolta e fix per ognuno, è in
-[AS-IS.md](AS-IS.md).
+**Tutti i problemi individuati nell'analisi Ubuntu sono chiusi**, e con loro i
+percorsi che il codice stesso dichiarava rotti. Il registro completo, con
+sintomo, causa, prova raccolta e fix per ognuno, è in [AS-IS.md](AS-IS.md).
 
-Suite di test: **46 casi**, tutti verdi (erano 33 prima degli interventi).
+Suite di test: **62 casi**, tutti verdi (erano 33 all'inizio, 46 dopo
+l'analisi Ubuntu).
 
 ---
 
-## Non affrontato: percorsi che il codice stesso dichiara rotti
+## Ripristinare il supporto Sonos
 
-Questi punti **non facevano parte dell'analisi Ubuntu**: sono difetti
-preesistenti che il sorgente segnala da sé, e nessuno di essi si incontra
-sul percorso Linux normale (cast audio, video, tray). Sono elencati qui
-perché è l'unico backlog che resta.
+È l'unica voce di backlog rimasta. Il codice che pilotava gli speaker Sonos è
+irraggiungibile da un refactor in poi:
+[`cast.py`](mkchromecast/cast.py) contiene `_DisabledSonosCasting`, che nessuno
+istanzia e il cui `play_cast()` alza prima di arrivare allo speaker.
 
-### Supporto Sonos
+La documentazione ora lo dice apertamente (commit `7b38c65d`) invece di
+promettere una funzione assente, quindi **non c'è più niente di ingannevole**:
+resta solo il lavoro, se qualcuno lo vuole fare.
 
-[`cast.py`](mkchromecast/cast.py) contiene `_DisabledSonosCasting`, la cui
-docstring dice *"This is broken, but should simplify the Chromecast support
-code until the Sonos support can be unbroken at some later point."*
-`play_cast()` alza deliberatamente:
+Cosa servirebbe:
 
-```python
-raise Exception("Internal error: This code path is broken and "
-                "needs to be fixed.")
-```
+1. Istanziare la classe quando `soco` trova degli speaker, e unire la sua
+   `cclist` a quella dei Chromecast (oggi le due `initialize_cast()` sono
+   copie divergenti).
+2. Togliere il `raise` da `play_cast()` e verificare `play_uri()` contro
+   l'API attuale di `soco`.
+3. Collegare i controlli della tray, che per i Sonos hanno percorsi separati
+   ([`systray.py:431`](mkchromecast/systray.py#L431),
+   [`:452`](mkchromecast/systray.py#L452),
+   [`:530`](mkchromecast/systray.py#L530)).
+4. Unificare le due `input_device()`: quella di `Casting` è stata sistemata
+   (`ee33dc84`), quella dentro `_DisabledSonosCasting` è ancora la copia
+   vecchia col `raise`.
 
-La classe non è raggiungibile dall'esterno: `soco` viene importato, ma
-`Casting` non la usa mai. Il supporto Sonos è quindi **assente**, non solo
-difettoso — il README però lo pubblicizza ancora.
+**Serve hardware.** Nessuna di queste modifiche è verificabile senza uno
+speaker Sonos in rete; senza prova sul campo si otterrebbe solo codice non
+testato al posto di codice disabilitato.
 
-### Riselezione del device dopo un indice non valido
+---
 
-[`cast.py`](mkchromecast/cast.py), in `Casting.input_device()`: sul ramo
-`except IndexError` il codice originale chiamava un metodo inesistente, e
-oggi c'è al suo posto un `raise Exception("Internal error: Never worked")`.
-Si arriva lì digitando un indice fuori intervallo dopo `-s`.
+## Limitazioni note, dichiarate nel codice
 
-### Riconnessione automatica del backend node
+Non sono difetti da correggere ma scelte in attesa, già segnalate all'utente
+quando le incontra:
 
-[`node.py:163`](mkchromecast/node.py#L163): quando il server node muore, il
-percorso di riconnessione alza `Internal error: Never worked`. Il commento
-sopra spiega il perché — la vecchia implementazione poteva generare
-processi a catena all'infinito. Su Linux il backend node non è comunque fra
-quelli audio supportati.
-
-### `-vf` specificato due volte
-
-[`pipeline_builder.py:244-246`](mkchromecast/pipeline_builder.py#L244-L246):
-usando insieme `--subtitles` e `--resolution` su un file non-mkv, ffmpeg
-riceve `-vf` due volte e ne ignora uno. Difetto ereditato
-dall'implementazione originale e annotato nel codice.
+- **Sottotitoli con file mkv**: non supportati; il codice stampa
+  `Subtitles with mkv are not supported yet.`
+  ([`pipeline_builder.py`](mkchromecast/pipeline_builder.py), `_input_file_subtitle`).
+  I sottotitoli su file **non**-mkv funzionano da `46bf7d75` — prima non
+  funzionavano affatto.
 
 ---
 
@@ -60,7 +59,7 @@ dall'implementazione originale e annotato nel codice.
 Per qualunque intervento futuro:
 
 ```bash
-# la suite deve restare verde (baseline attuale: 46/46)
+# la suite deve restare verde (baseline attuale: 62/62)
 python -m unittest discover -s tests -v
 ```
 

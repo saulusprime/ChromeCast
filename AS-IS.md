@@ -6,8 +6,9 @@ fix applicato**, con il commit che lo introduce.
 
 Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 
-**Stato:** tutti i problemi individuati sono chiusi. Suite di test da 33 a
-**46** casi.
+**Stato:** tutti i problemi individuati sono chiusi, e con loro i tre percorsi
+che il codice stesso dichiarava rotti (#11, #12, #13) e le promesse su Sonos
+che il codice non manteneva (#14). Suite di test da 33 a **62** casi.
 
 ## Ambiente di prova
 
@@ -660,6 +661,147 @@ già marcata come rotta, ma va sistemato quando la si riabilita.
 
 ---
 
+## 🟣 Percorsi che il codice dichiarava rotti  ✅ RISOLTI
+
+Non facevano parte dell'analisi Ubuntu: erano difetti preesistenti che il
+sorgente segnalava da sé, con un `raise` messo lì apposta al posto della
+logica mancante.
+
+### #11 — Un indice di device sbagliato faceva morire l'applicazione  ✅ `ee33dc84`
+
+**Sintomo.** Con `-s`, digitando un indice fuori dall'elenco, l'applicazione
+alzava `Exception: Internal error: Never worked; needs to be fixed.`
+
+**Causa.** [`cast.py`](mkchromecast/cast.py), `Casting.input_device()`: il ramo
+`except IndexError` chiamava in origine `self.select_device()`, un metodo mai
+esistito (`select_device` è un flag booleano), e il refactor ci ha lasciato il
+`raise` al suo posto. In più l'indice veniva scritto nel file pickle **prima**
+di essere validato, quindi la scelta sbagliata sopravviveva alla sessione.
+
+**Prova.** Contro la discovery reale, digitando `99`:
+
+```console
+$ printf '99\n1\n' | ... input_device()
+Exception: Internal error: Never worked; needs to be fixed.
+```
+
+**Fix.** L'indice si risolve prima di essere registrato, e solo uno valido
+arriva al pickle. Tutto ciò che non è un numero dentro l'intervallo dei device
+elencati costa uno dei `SELECTION_ATTEMPTS` tentativi e un nuovo prompt;
+esaurirli chiude l'applicazione con un messaggio invece che con un traceback.
+Gli indici negativi vengono rifiutati anziché contare dalla fine.
+
+L'EOF sul prompt si gestisce in `select_a_device()`, cioè dove si legge
+davvero: il primo prompt lo fa [`bin/mkchromecast:153`](bin/mkchromecast#L153),
+fuori da `input_device()`, quindi gestirlo solo nel ciclo di riprova lasciava
+comunque il traceback con stdin chiuso. **Trovato dalla prova dal vivo, non
+dai test unitari.**
+
+**Verifica.**
+```console
+$ printf '99\n1\n' | ...          # indice sbagliato, poi buono
+'99' is not one of the indexes listed above.
+Casting to: Seminterrato            # pickle = 1
+
+$ printf '99\nxx\n-1\n' | ...    # tre sbagliati
+No device was selected.             # exit 1, nessun /tmp/mkchromecast.tmp
+
+$ ... < /dev/null                   # stdin chiuso
+No index was given: standard input is closed.   # exit 1
+```
+
+### #12 — La riconnessione del backend node poteva generare processi a catena  ✅ `36b71830`
+
+**Sintomo.** Quando il server node moriva, il percorso di riconnessione alzava
+`Internal error: Never worked; needs to be fixed.`
+
+**Causa.** [`node.py`](mkchromecast/node.py) riavviava node chiamando
+`stream_audio()`, che lancia una copia nuova di *questo stesso processo*: ogni
+riavvio annidava un processo dentro il precedente, e un node che falliva
+all'avvio trasformava la cosa in una catena senza fine. Il commento sopra il
+`raise` diceva esattamente questo.
+
+**Fix.** Il riavvio avviene sul posto — è lo stesso processo a rilanciare node
+— quindi la ricorsione temuta dal commento sparisce, ed è limitato da
+`NODE_RECONNECT_ATTEMPTS`. Un server che ha retto per
+`NODE_HEALTHY_UPTIME_SECONDS` si riprende il tentativo speso: senza, una lunga
+sessione con la tray consumerebbe il budget nell'arco di giorni e poi
+smetterebbe di riconnettersi per sempre.
+
+Al device si dice di leggere il nuovo server solo dopo che node è
+sopravvissuto al periodo di grazia: puntarlo a un server morto all'avvio
+produrrebbe solo silenzio. Il watchdog sul processo principale e il notifier
+macOS sono usciti dal ciclo in `watch_until_exit()` e `notify_reconnecting()`;
+`kill()` e `relaunch()`, che esistevano solo per il vecchio riavvio, sono
+stati rimossi.
+
+**Non verificato contro un server reale:** `webcast-osx-audio` è solo per
+macOS e node non è fra i backend audio Linux. Il limite, la politica di
+recasting e il recupero del budget sono coperti da test.
+
+### #13 — `-vf` specificato due volte, e sottotitoli mai funzionanti su file non-mkv  ✅ `46bf7d75`
+
+**Sintomo dichiarato.** Usando insieme `--subtitles` e `--resolution` su un
+file non-mkv, ffmpeg riceveva `-vf` due volte e ne ignorava uno.
+
+**Prova.** Con ffmpeg 7 sulla macchina di prova:
+
+```console
+$ ffmpeg -i sample.mp4 -vcodec libx264 -vf "subtitles=sub.srt" -vf "scale=1920x1080" out.mp4
+$ ffprobe -show_entries stream=width,height out.mp4
+1920,1080                        # scalato, sottotitoli spariti senza un avviso
+```
+
+**Fix.** I due filtri finiscono in un solo `-vf`, con la scala per prima così i
+sottotitoli vengono disegnati alla risoluzione di uscita invece di essere
+scalati insieme all'immagine.
+
+**Due difetti emersi dalla stessa riga di comando.**
+
+*I sottotitoli su file non-mkv non hanno mai funzionato.* La politica di
+codifica sceglieva `-vcodec copy`, e ffmpeg rifiuta un filtergraph accanto a
+uno stream copy:
+
+```console
+$ ffmpeg -i sample.mp4 -vcodec copy -vf "subtitles=sub.srt" out.mp4
+Filtergraph 'subtitles=sub.srt' was specified, but codec copy was selected.
+Filtering and streamcopy cannot be used together.
+```
+Ora la politica guarda se c'è qualcosa da filtrare, non solo la risoluzione.
+
+*Il percorso del file sottotitoli finiva nel filtro senza escaping*, cosa che
+conta di più ora che i filtri sono uniti da virgole: una virgola nel nome
+chiudeva il filtro e ne apriva uno inesistente (`No such filter: 'ird
+sub.srt'`). Il percorso attraversa tre parser prima di arrivare a libass, per
+cui ogni carattere speciale vuole tre backslash; i livelli sono stati
+determinati provando ffmpeg con nomi contenenti virgole, due punti, parentesi
+quadre, apici e backslash.
+
+**Verifica.** I comandi generati sono stati eseguiti davvero da ffmpeg —
+sottotitoli da soli, risoluzione da sola, e insieme con un file chiamato
+`we,ird: [it's] a sub.srt`: tutti e tre completano senza errori.
+
+### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
+
+**Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
+offrivano il cast verso gli speaker Sonos; il README spiegava anche come
+abilitarlo installando `soco`.
+
+**Causa.** Il codice che pilotava i Sonos è irraggiungibile da un refactor in
+poi: nessuno istanzia `_DisabledSonosCasting`, e il suo `play_cast()` alza
+prima di arrivare allo speaker.
+
+**Fix (scelta: allineare la documentazione).** Ora dicono ciò che è vero. La
+sezione Sonos del README spiega dov'è finito il codice e che il ripristino sta
+nel backlog, il known issue sui codec Sonos punta lì, e la docstring della
+classe dice apertamente che nessuno la istanzia. `soco` resta una dipendenza,
+tenuta per chi ripristinerà la classe.
+
+---
+
+
+---
+
 ## Dipendenze di sistema per Ubuntu  ✅ documentate nel README
 
 ```bash
@@ -700,13 +842,17 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | P3 | `setup.py`, `netifaces` → `ifaddr` | `9004388b` |
 | P3 | Singleton `Mkchromecast`, effetti all'import di `audio.py` | `a9936424` |
 | — | Dipendenze di sistema nel README | `54a9598b` |
+| #11 | Indice di device sbagliato: niente riselezione | `ee33dc84` |
+| #12 | Riconnessione node a catena di processi | `36b71830` |
+| #13 | `-vf` doppio; sottotitoli mai funzionanti su non-mkv | `46bf7d75` |
+| #14 | Sonos pubblicizzato ma assente | `7b38c65d` |
 
 ---
 
 ## Verifiche di regressione
 
 ```bash
-# 1. i test devono restare verdi (33 prima dei fix, 46 dopo)
+# 1. i test devono restare verdi (33 prima dei fix, 62 dopo)
 python -m unittest discover -s tests -v
 
 # 2. discovery: output visibile anche in pipe, exit code 0
@@ -722,4 +868,10 @@ mkchromecast -p 5000 -n <device>             # con shairport-sync attivo
 
 # 5. coerenza del sample rate
 parec -v --format=s16le --rate=48000 -d Mkchromecast.monitor   # deve dire 48000Hz
+
+# 6. selezione del device: un indice sbagliato richiede, non uccide
+mkchromecast -s --discover                   # digita 99, poi un indice valido
+
+# 7. sottotitoli su file non-mkv, con e senza --resolution
+mkchromecast --video -i film.mp4 --subtitles sub.srt --resolution 720p
 ```
