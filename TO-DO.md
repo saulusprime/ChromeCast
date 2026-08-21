@@ -1,77 +1,68 @@
 # TO-DO — lavoro rimasto
 
-Quanto già corretto è documentato in [AS-IS.md](AS-IS.md), che conserva per
-ogni problema il sintomo, la causa, la prova raccolta e il fix applicato.
+**Tutti i problemi individuati nell'analisi Ubuntu sono chiusi.** Il registro
+completo, con sintomo, causa, prova raccolta e fix per ognuno, è in
+[AS-IS.md](AS-IS.md).
+
+Suite di test: **46 casi**, tutti verdi (erano 33 prima degli interventi).
 
 ---
 
-## 🔵 P3 — `Mkchromecast` istanziato più volte all'import
+## Non affrontato: percorsi che il codice stesso dichiara rotti
 
-**Stato: parziale** (`68b4a0d8`). Il rumore a video è passato da 18 righe a
-1 — l'avviso sul path beta viene stampato una sola volta per processo e il
-resto è finito sotto `--debug`. **La causa vera resta**: `audio.py`,
-`preferences.py`, `tray_threading.py` e `systray.py` costruiscono ciascuno
-un `Mkchromecast()` a livello di modulo.
+Questi punti **non facevano parte dell'analisi Ubuntu**: sono difetti
+preesistenti che il sorgente segnala da sé, e nessuno di essi si incontra
+sul percorso Linux normale (cast audio, video, tray). Sono elencati qui
+perché è l'unico backlog che resta.
 
-### Come si manifesta
+### Supporto Sonos
 
-```console
-$ mkchromecast -t
-:::config::: WARNING: USING BETA CONFIG PATH: ~/.config/mkchromecast/mkchromecast_beta.cfg
+[`cast.py`](mkchromecast/cast.py) contiene `_DisabledSonosCasting`, la cui
+docstring dice *"This is broken, but should simplify the Chromecast support
+code until the Sonos support can be unbroken at some later point."*
+`play_cast()` alza deliberatamente:
+
+```python
+raise Exception("Internal error: This code path is broken and "
+                "needs to be fixed.")
 ```
 
-Prima erano 18 righe di questo tipo, una terna per ciascuna delle sei
-istanze. Ora ne resta una sola, ma le sei istanze ci sono ancora: ogni
-`Mkchromecast()` rilegge e rivalida il file di configurazione, e ogni
-import di `mkchromecast.audio` riesegue la costruzione del comando
-dell'encoder.
+La classe non è raggiungibile dall'esterno: `soco` viene importato, ma
+`Casting` non la usa mai. Il supporto Sonos è quindi **assente**, non solo
+difettoso — il README però lo pubblicizza ancora.
 
-### Dove
+### Riselezione del device dopo un indice non valido
 
-| File | Cosa fa all'import |
-|---|---|
-| [`audio.py`](mkchromecast/audio.py) | `_mkcc = mkchromecast.Mkchromecast()` + costruisce il comando |
-| [`preferences.py`](mkchromecast/preferences.py) | `_mkcc = mkchromecast.Mkchromecast()` |
-| [`tray_threading.py`](mkchromecast/tray_threading.py) | `_mkcc = mkchromecast.Mkchromecast()` |
-| [`systray.py`](mkchromecast/systray.py) | `_mkcc = mkchromecast.Mkchromecast()` |
+[`cast.py`](mkchromecast/cast.py), in `Casting.input_device()`: sul ramo
+`except IndexError` il codice originale chiamava un metodo inesistente, e
+oggi c'è al suo posto un `raise Exception("Internal error: Never worked")`.
+Si arriva lì digitando un indice fuori intervallo dopo `-s`.
 
-Ognuno di questi porta il commento `TODO(xsdg): Encapsulate this so that we
-don't do this work on import.`
+### Riconnessione automatica del backend node
 
-### Perché non è stato fatto
+[`node.py:163`](mkchromecast/node.py#L163): quando il server node muore, il
+percorso di riconnessione alza `Internal error: Never worked`. Il commento
+sopra spiega il perché — la vecchia implementazione poteva generare
+processi a catena all'infinito. Su Linux il backend node non è comunque fra
+quelli audio supportati.
 
-È una modifica architetturale, non un fix puntuale: va introdotto il
-singleton già previsto dai TODO nel codice e vanno spostati fuori
-dall'import gli effetti collaterali di `audio.py`. Tocca il percorso della
-tray, quello della CLI e quello del processo di streaming, che oggi si
-affidano proprio a quel lavoro fatto all'import.
+### `-vf` specificato due volte
 
-### Da tenere presente
-
-`Mkchromecast` ha già una cache degli argomenti a livello di classe
-([`__init__.py:20-29`](mkchromecast/__init__.py#L20-L29)): le varie istanze
-condividono il parsing, ma non il resto dello stato. Inoltre
-[`video.py:20`](mkchromecast/video.py#L20) costruisce un `Mkchromecast`
-**dentro** il processo di streaming, dopo il `fork`. Qualunque
-riorganizzazione va verificata contro quel percorso, oltre che contro
-tray e CLI.
+[`pipeline_builder.py:244-246`](mkchromecast/pipeline_builder.py#L244-L246):
+usando insieme `--subtitles` e `--resolution` su un file non-mkv, ffmpeg
+riceve `-vf` due volte e ne ignora uno. Difetto ereditato
+dall'implementazione originale e annotato nel codice.
 
 ---
 
 ## Verifiche
 
-Prima di considerare chiuso il punto:
+Per qualunque intervento futuro:
 
 ```bash
-# la suite deve restare verde (baseline attuale: 42/42)
+# la suite deve restare verde (baseline attuale: 46/46)
 python -m unittest discover -s tests -v
-
-# la tray deve continuare a partire e a trovare i device
-mkchromecast -t
-
-# il cast da CLI deve continuare a funzionare
-mkchromecast -n <device> -p 5001
 ```
 
-Le verifiche complete di tutti i fix già applicati sono in
+Le verifiche funzionali complete sono in
 [AS-IS.md](AS-IS.md#verifiche-di-regressione).

@@ -6,7 +6,8 @@ fix applicato**, con il commit che lo introduce.
 
 Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 
-**Stato:** 17 problemi su 18 chiusi. Suite di test da 33 a **42** casi.
+**Stato:** tutti i problemi individuati sono chiusi. Suite di test da 33 a
+**46** casi.
 
 ## Ambiente di prova
 
@@ -595,8 +596,27 @@ già marcata come rotta, ma va sistemato quando la si riabilita.
 
 ## 🔵 P3 — Minori / robustezza  ✅ RISOLTI
 
-Una decima voce, il rumore di config all'avvio della tray, è risolta solo
-in parte: vedi [TO-DO.md](TO-DO.md).
+- ✅ `a9936424` — **`Mkchromecast` istanziato sei volte all'import.** `audio.py`,
+  `preferences.py`, `tray_threading.py` e `systray.py` ne costruivano uno
+  ciascuno, quindi ogni avvio faceva sei volte il parsing della riga di
+  comando e il caricamento del file di configurazione. Ora la costruzione
+  senza argomenti restituisce un'istanza condivisa; passando `args`
+  espliciti si ottiene comunque un oggetto separato, come richiesto dai
+  test.
+
+  Anche `audio.py` faceva il lavoro vero all'import (risoluzione del
+  backend, clamp del bitrate, quantizzazione del sample rate, costruzione
+  del comando, e relative stampe). Da Python 3.14 `multiprocessing` usa
+  **`forkserver`**: il processo di streaming re-importa il modulo invece di
+  ereditarlo, quindi tutte quelle righe venivano stampate una seconda
+  volta. Ora le impostazioni si costruiscono al primo uso e le stampa le fa
+  solo il processo che avvia il server.
+
+  Lo stesso passaggio a `forkserver` aveva rotto in silenzio la pulizia di
+  emergenza del processo di streaming: chiamava `remove_sink()`, ma lo
+  stato che identifica il sink vive nel padre e non viene ereditato, quindi
+  non faceva nulla. Ora il sink viene prima cercato. Verificato uccidendo
+  il padre con SIGKILL: prima il sink sopravviveva.
 
 - ✅ `81bd771f` — **`check_sink()` ritornava `None` se `pactl` mancava**, e
   l'unico chiamante testava `is False`: l'assenza di `pactl` veniva quindi
@@ -678,6 +698,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | P3 | Icone legate alla CWD, rumore di config | `68b4a0d8` |
 | P3 | `pkill` fuori dal nostro albero, `backend.path` | `536f7d73` |
 | P3 | `setup.py`, `netifaces` → `ifaddr` | `9004388b` |
+| P3 | Singleton `Mkchromecast`, effetti all'import di `audio.py` | `a9936424` |
 | — | Dipendenze di sistema nel README | `54a9598b` |
 
 ---
@@ -685,7 +706,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 ## Verifiche di regressione
 
 ```bash
-# 1. i test devono restare verdi (33 prima dei fix, 42 dopo)
+# 1. i test devono restare verdi (33 prima dei fix, 46 dopo)
 python -m unittest discover -s tests -v
 
 # 2. discovery: output visibile anche in pipe, exit code 0
