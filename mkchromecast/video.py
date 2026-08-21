@@ -56,6 +56,9 @@ def main():
     if mkcc.backend != "node":
         pipeline = stream_infra.PipelineProcess(_flask_init, ip, mkcc.port, mkcc.platform)
         pipeline.start()
+        if not pipeline.wait_until_serving():
+            print(colors.error("The streaming server failed to start."))
+            utils.terminate()
     else:
         print("Starting Node")
 

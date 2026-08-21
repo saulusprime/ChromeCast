@@ -1,12 +1,14 @@
 # This file is part of mkchromecast.
 
 from dataclasses import dataclass
+import errno
 import flask
 from functools import partial
 import multiprocessing
 import os
 import pickle
 import psutil
+import socket
 from subprocess import Popen, PIPE
 import sys
 import textwrap
@@ -202,17 +204,69 @@ class FlaskServer:
         return flask.Response(iter(read_chunk, b""), mimetype=FlaskServer._media_type)
 
 
+def port_is_free(host: str, port: int) -> bool:
+    """Returns whether we can bind a listening socket on host:port."""
+    probe_host = "0.0.0.0" if host in {"", "0.0.0.0"} else host
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind((probe_host, port))
+            return True
+        except OSError as e:
+            if e.errno in {errno.EADDRINUSE, errno.EACCES}:
+                return False
+            raise
+
+
 # Launching the pipeline command in a separate process.
 class PipelineProcess:
     def __init__(self, flask_init: Callable, host: str, port: int, platform: str):
+        self._host = host
+        self._port = port
         self._proc = multiprocessing.Process(
             target=PipelineProcess.start_app,
             args=(flask_init, host, port, platform,)
         )
         self._proc.daemon = True
 
-    def start(self):
+    def start(self) -> None:
+        """Starts the streaming server, aborting if the port is unavailable.
+
+        Without this check, a failed bind would only be reported on the child
+        process' stdout, and we would go on to point the cast device at a port
+        served by some unrelated program.
+        """
+        if not port_is_free(self._host, self._port):
+            print(colors.error(
+                f"Port {self._port} is already in use by another program."))
+            print(colors.options("Hint:")
+                  + f" retry with --port {self._port + 1}, or free that port. "
+                  "On Ubuntu it is often taken by shairport-sync; check with "
+                  "`systemctl status shairport-sync`.")
+            raise SystemExit(1)
+
         self._proc.start()
+
+    def wait_until_serving(self, timeout: float = 10.0) -> bool:
+        """Waits until the streaming server accepts connections.
+
+        Returns:
+            True once the server is reachable, or False if the process died or
+            did not come up before the timeout expired.
+        """
+        host = "127.0.0.1" if self._host in {"", "0.0.0.0"} else self._host
+        deadline = time.monotonic() + timeout
+
+        while time.monotonic() < deadline:
+            if not self._proc.is_alive():
+                return False
+            try:
+                with socket.create_connection((host, self._port), timeout=0.5):
+                    return True
+            except OSError:
+                time.sleep(0.2)
+
+        return False
 
     @staticmethod
     def start_app(flask_init: Callable, host: str, port: int, platform: str):
