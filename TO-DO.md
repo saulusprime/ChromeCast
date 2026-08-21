@@ -576,86 +576,56 @@ già marcata come rotta, ma va sistemato quando la si riabilita.
 
 ---
 
-## 🔵 P3 — Minori / robustezza
+## 🔵 P3 — Minori / robustezza  ✅ RISOLTI (una voce solo in parte)
 
-- **`check_sink()` ritorna ancora `None` se `pactl` manca.** La gestione a
-  base di `TypeError` è stata rimossa in `7dc8ec28`, ma resta il fatto che
-  [`pulseaudio.py:54-75`](mkchromecast/pulseaudio.py#L54-L75) confronta una
-  `str` dentro dei `bytes` e si affida al `TypeError` risultante. Decodificare
-  una volta sola. Inoltre ritorna `None` se `pactl` non esiste, ma
-  [`tray_threading.py:67`](mkchromecast/tray_threading.py#L67) testa
-  `check_sink() is False`: con `None` il sink non viene creato, in silenzio.
-  Far ritornare `bool` e gestire l'assenza di `pactl` con un errore esplicito.
+- ✅ `81bd771f` — **`check_sink()` ritornava `None` se `pactl` mancava**, e
+  l'unico chiamante testava `is False`: l'assenza di `pactl` veniva quindi
+  letta come "il sink esiste già" e non se ne creava mai uno. Ora l'assenza è
+  un `PulseAudioNotAvailable` esplicito, con il pacchetto da installare; la
+  CLI lo trasforma in una riga di errore ed esce 1, la tray segna il
+  tentativo come fallito senza morire.
 
-- **`create_sink()` non verifica l'esito.**
-  [`pulseaudio.py:10-27`](mkchromecast/pulseaudio.py#L10-L27) salva
-  `csoutput[:-1]` senza controllare il return code. Se `pactl` fallisce salva
-  una stringa vuota, e il successivo `remove_sink()` esegue
-  `pactl unload-module ''` con `check=True` → eccezione. Controllare
-  `returncode` e alzare un errore leggibile.
+- ✅ `7dc8ec28` — **`create_sink()` non verificava l'esito.** Ora controlla il
+  return code e l'indice del modulo, e `remove_sink()` è idempotente.
 
-- **Icone della tray legate alla CWD.**
-  [`systray.py:135-147`](mkchromecast/systray.py#L135-L147) verifica
-  l'esistenza di `images/<nome>.icns` (formato **macOS**) per decidere se
-  caricare `images/<nome>.png` (Linux), con percorsi relativi alla directory
-  corrente. Lanciando da una CWD diversa dal repo le icone spariscono.
-  Usare `os.path.dirname(__file__)` e testare direttamente il `.png` su Linux.
+- ✅ `68b4a0d8` — **Icone della tray legate alla CWD.** Risolte a partire dalla
+  directory del package, poi da `/usr/share`, poi dalla CWD per il bundle
+  macOS. Verificato da `/`, `/tmp` e dal repo.
 
-- **Config riletto 6 volte all'avvio della tray**, con
-  `WARNING: USING BETA CONFIG PATH` ripetuto ad ogni giro: è l'effetto dei vari
-  `Mkchromecast()` a livello di modulo (`audio.py`, `preferences.py`,
-  `tray_threading.py`, `systray.py`). Da risolvere con il singleton già
-  previsto dai TODO nel codice. Nota: la config della tray è `read_only=True`,
-  quindi le chiavi mancanti non vengono **mai** salvate e vengono ricalcolate
-  ad ogni avvio.
+- ⚠️ `68b4a0d8` — **Config riletto 6 volte all'avvio della tray.** Il rumore è
+  passato da 18 righe a 1 (avviso sul path beta una sola volta per processo,
+  il resto sotto `--debug`). **La causa vera resta**: `audio.py`,
+  `preferences.py`, `tray_threading.py` e `systray.py` costruiscono un
+  `Mkchromecast()` a livello di modulo. Serve il singleton già previsto dai
+  TODO nel codice: è una modifica architetturale, non un fix puntuale.
 
-- **`tray_threading.py`: la globale `cast` viene ribindata da modulo a
-  oggetto.** `_play_cast_` dichiara `global cast` e poi fa `cast = start.cast`
-  ([`tray_threading.py:52`](mkchromecast/tray_threading.py#L52),
-  [`:78`](mkchromecast/tray_threading.py#L78)). Dopo il primo play riuscito il
-  nome `cast` non è più il modulo, quindi alla chiamata successiva
-  `cast.Casting(_mkcc)` ([`:73`](mkchromecast/tray_threading.py#L73)) alza
-  `AttributeError` fuori da qualsiasi `try`, uccidendo il thread della tray.
-  Trovato mentre si applicava il fix #2 (per questo `CastError` è importata
-  direttamente e non come `cast.CastError`). Usare un attributo d'istanza al
-  posto della globale.
+- ✅ `81bd771f` — **`global cast` ribindato da modulo a oggetto.** Ora è un
+  attributo del `Player`, che è anche come la tray lo rilegge.
 
-- **`tray_threading.py:101`**: `if chk.ip == "127.0.0.1" or None:` — l'`or None`
-  non ha alcun effetto (si valuta sempre il primo operando). Poco sotto, il
-  confronto di versioni è fra stringhe e usa
-  `e.strip('"tag_name":')`, che rimuove un *insieme di caratteri* e non un
-  prefisso: su `v0.3.10` produce risultati sbagliati. Usare `json.loads()`
-  sulla risposta dell'API e `packaging.version.parse` per il confronto.
+- ✅ `81bd771f` — **`or None` senza effetto e confronto di versioni fra
+  stringhe** (che metteva `0.3.9` sopra `0.3.10`), con il tag estratto via
+  `str.strip`. Ora si legge il JSON e si confronta con
+  `utils.version_tuple`, coperta da test.
 
-- **`backend_handler` uccide processi non suoi.**
-  [`bin/mkchromecast:247-267`](bin/mkchromecast#L247-L267) usa
-  `pkill -STOP -f ffmpeg`, che colpisce **qualunque** ffmpeg dell'utente. Già
-  annotato con un TODO nel sorgente. Tenere il riferimento al `Popen` e agire
-  su quello.
+- ✅ `536f7d73` — **`backend_handler` uccideva processi non suoi.** Niente più
+  `pkill -f ffmpeg`: si percorre il proprio albero di processi con `psutil`.
+  Verificato che un ffmpeg estraneo resti `running` mentre il nostro passa a
+  `stopped`.
 
-- **`setup.py` non dichiara le dipendenze.** `requires=` è deprecato e ignorato
-  da setuptools (va usato `install_requires=`); `LINUX_REQUIRES` elenca
-  `mutagen` ma **non** `pychromecast`, `soco`, `netifaces`. Il classifier è
-  fermo a `Programming Language :: Python :: 3.6`.
+- ✅ `9004388b` — **`setup.py` non dichiarava le dipendenze.** `requires=` →
+  `install_requires=`, elenco corretto (mancavano pychromecast e soco, c'era
+  `mutagen` che non è importato da nessuna parte), `python_requires=">=3.9"`.
 
-- **`netifaces` non è più manutenuto** e non ha wheel per le versioni recenti
-  di Python. Serve solo in `_get_first_network_ip_by_netifaces()`
-  ([`utils.py:250-260`](mkchromecast/utils.py#L250-L260)), che è un fallback
-  del ramo **non-Linux**. Sostituirlo con `ifaddr` (già presente come
-  dipendenza transitiva di `zeroconf`) o rimuoverlo dai requirements Linux.
+- ✅ `9004388b` — **`netifaces` sostituito con `ifaddr`**, già presente come
+  dipendenza di `zeroconf`. Niente più compilazione durante `pip install`.
 
-- **`audio.py:77`** assegna `backend.path = backend.name`, e la risoluzione
-  vera con `shutil.which` avviene **solo** in modalità tray
-  ([`audio.py:80`](mkchromecast/audio.py#L80)) — con un `TODO` che si domanda
-  il perché. Va unificato: risolvere sempre con `shutil.which` rispettando il
-  `PATH` dell'utente, e se il risultato è `None` fallire con un messaggio
-  chiaro invece di finire nel ramo `else` di
-  [`stream_infra.py:186-196`](mkchromecast/stream_infra.py#L186-L196), che
-  lancerebbe `lame` senza stdin.
+- ✅ `536f7d73` — **`audio.py` non risolveva davvero il backend.** Ora
+  `shutil.which` in ogni modalità, con errore chiaro se il backend non c'è;
+  i percorsi hardcoded restano solo su Darwin per il bundle `.app`.
 
 ---
 
-## Dipendenze di sistema per Ubuntu (da aggiungere al README)
+## Dipendenze di sistema per Ubuntu  ✅ documentate nel README
 
 ```bash
 # runtime
@@ -682,11 +652,12 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 - [x] #5 `findall(testo)` senza il flag come `pos` (`pulseaudio.py:94`) — `7dc8ec28`
 - [x] #6 `--rate` a `parec` + rate di input a `lame`/`oggenc`/`faac`; aggiornare i test — `53c8b7ee`
 - [x] #7 `terminate()` con SIGTERM, flush e `os._exit(0)` (`utils.py`) — `6fcb4454`
-- [ ] #8 Inizializzare `bitrate`/`samplerate` (`node.py`); validare il backend da config (`__init__.py:117`)
-- [ ] #9 `shutil.which("node")` (`node.py:56`)
-- [ ] #10 `cast_info` al posto di `device` (`cast.py`)
-- [ ] P3: `check_sink`/`create_sink`, icone, config duplicata, `pkill`, `setup.py`, `netifaces`, `backend.path`
-- [ ] README: dipendenze di sistema Ubuntu aggiornate
+- [x] #8 Inizializzare `bitrate`/`samplerate` (`node.py`); validare il backend da config — `c0072fa6`
+- [x] #9 `shutil.which("node")`, e `--port` non più ignorato — `c0072fa6`
+- [x] #10 `cast_info` al posto di `device` (`cast.py`) — `c0072fa6`
+- [x] P3 — `81bd771f`, `68b4a0d8`, `536f7d73`, `9004388b`
+- [ ] Resta da P3: il singleton `Mkchromecast` (oggi istanziato 6 volte all'import)
+- [x] README: dipendenze di sistema Ubuntu aggiornate
 
 ## Verifiche di regressione
 

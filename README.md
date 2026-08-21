@@ -283,11 +283,50 @@ managers coming with their distributions.
 Example for Debian based distros:
 
 ```
-sudo apt-get install python3.6 python3-pip python3-pychromecast python3-flask python3-psutil python3-setuptools python3-mutagen python3-gi vorbis-tools sox lame flac faac opus-tools
+sudo apt install python3 python3-pip python3-venv python3-pychromecast python3-flask python3-psutil python3-setuptools
 ```
 
 **Note**: if `python3-pychromecast` is not available in your repository,
 follow instructions in [#9](https://github.com/muammar/mkchromecast/issues/9).
+
+##### System packages (Linux)
+
+`pactl` and `parec` come from `pulseaudio-utils` and are required by the
+default Linux backend, including on systems where PipeWire provides the
+PulseAudio interface. The encoders are separate packages, one per audio
+codec:
+
+```
+sudo apt install pulseaudio-utils ffmpeg lame vorbis-tools opus-tools flac sox
+```
+
+| Package         | Needed for                |
+| --------------- | ------------------------- |
+| pulseaudio-utils| `parec` backend, `--reset`|
+| lame            | `-c mp3` (the default)    |
+| vorbis-tools    | `-c ogg`                  |
+| opus-tools      | `-c opus`                 |
+| flac            | `-c flac`                 |
+| sox             | `-c wav`                  |
+| ffmpeg          | `--encoder-backend ffmpeg`, video |
+
+`faac`, needed for `-c aac` with the `parec` backend, is not in the main
+Ubuntu repositories; use `--encoder-backend ffmpeg` instead.
+
+Desktop notifications are optional and need `PyGObject`, which only builds
+once its development headers are installed:
+
+```
+sudo apt install libgirepository-2.0-dev libcairo2-dev
+pip install PyGObject
+```
+
+Alternatively, use the distribution package and let the virtualenv see it:
+
+```
+sudo apt install python3-gi
+python3 -m venv --system-site-packages .venv
+```
 
 ##### BlackHole (macOS users only)
 
