@@ -1,3 +1,39 @@
+* Fork saulusprime/ChromeCast — Ubuntu work, **unreleased**
+
+    Fixes found by running the code on Ubuntu 26.04 with Python 3.14,
+    PipeWire and pychromecast 14. Every entry is documented in `AS-IS.md`
+    with symptom, cause, evidence collected and fix; `TO-DO.md` holds what
+    is left.
+
+    - Flask failing to bind is detected instead of leaving the device
+      reading from a port nothing serves.
+    - Casting works with pychromecast 14: the media session is awaited, an
+      app already running on the device is closed first, and a refused play
+      is reported rather than raised as a traceback.
+    - `--reset` removes the sinks in any locale, not only in English, by
+      reading `pactl --format=json` with `LC_ALL=C`.
+    - `--sample-rate` reaches `parec` as well as the encoder, so it is no
+      longer ignored in silence; `-c opus` is no longer 8.8% fast.
+    - Output survives being piped and the exit code means something: no more
+      SIGKILL on self, no more 137 for everything.
+    - The node backend runs at all (it raised `UnboundLocalError`), node is
+      found on the PATH, and `--port` is honoured.
+    - A device index that is not on the list asks again instead of raising.
+    - A dead node server is restarted in place, a bounded number of times,
+      rather than by spawning a copy of the process.
+    - `--subtitles` and `--resolution` share one `-vf`; subtitles on non-mkv
+      files work at all for the first time, and their path is escaped.
+    - Sonos is documented as unavailable rather than advertised: the code
+      that drove the speakers has been unreachable for some time.
+    - `pactl` missing is an error, sinks are created and removed reliably,
+      tray icons no longer depend on the working directory, `ffmpeg`
+      processes that are not ours are left alone, `setup.py` declares its
+      dependencies, and `netifaces` gives way to `ifaddr`.
+    - The `Makefile` gained Linux targets: `check`, `wheel`, `deb`,
+      `binary` (PyInstaller), `install`, `develop`, `run`, `clean-build`.
+      `make` no longer edits the source.
+    - Test suite from 33 to 62 cases.
+
 * Mkchromecast (0.3.9) **unreleased**
 
     - New flag `--loop` to loop video indefinitely while streaming. Closes

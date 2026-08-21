@@ -98,10 +98,11 @@ Requirements:
 In order to use **Mkchromecast** you need the following software to stream with
 `node.js`:
 
-* Python3.
-* pychromecast.
+* Python3 (3.9 or newer).
+* pychromecast (14.x).
 * psutil.
-* mutagen.
+* requests.
+* ifaddr.
 * [BlackHole](https://github.com/ExistentialAudio/BlackHole )
 * PyQt5 (optional if you want to use the system tray menu).
 
@@ -115,12 +116,13 @@ following:
 
 #### Linux
 
-* Pulseaudio.
+* Pulseaudio (PipeWire's PulseAudio interface works too).
 * Pavucontrol.
-* Python3 (if using the official debian package).
-* pychromecast.
+* Python3 (3.9 or newer).
+* pychromecast (14.x).
 * psutil.
-* mutagen.
+* requests.
+* ifaddr.
 * flask.
 * vorbis-tools.
 * sox.
@@ -140,11 +142,11 @@ requirements are:
 
 * alsa-base
 * alsa-utils
-* alsa-utils
-* Python3 (if using the official debian package).
-* pychromecast.
+* Python3 (3.9 or newer).
+* pychromecast (14.x).
 * psutil.
-* mutagen.
+* requests.
+* ifaddr.
 * flask.
 * vorbis-tools.
 * sox.
@@ -286,7 +288,9 @@ managers coming with their distributions.
 Example for Debian based distros:
 
 ```
-sudo apt install python3 python3-pip python3-venv python3-pychromecast python3-flask python3-psutil python3-setuptools
+sudo apt install python3 python3-pip python3-venv python3-pychromecast \
+    python3-flask python3-psutil python3-requests python3-ifaddr \
+    python3-pyqt5 python3-setuptools
 ```
 
 **Note**: if `python3-pychromecast` is not available in your repository,
@@ -367,6 +371,9 @@ the only build that can replace the distribution's own
 make deb
 sudo apt install ./dist/mkchromecast_0.3.9-1local1_all.deb
 ```
+
+Example: mkchromecast -n Seminterrato -p 5001
+
 
 The default revision, `1local1`, sorts above the packaged version, so apt
 treats a local build as an upgrade. Override it with
@@ -754,6 +761,12 @@ Known issues
 * When using `parec` and `lame` encoder, the delay between audio played and
   listened can be up to 8 seconds. I suggest you to use something different
   than mp3.
+* The streaming server listens on port 5000 by default, which other software
+  may already hold -- `shairport-sync` is a common one. Mkchromecast now says
+  so and stops, rather than pointing the device at a port it does not serve:
+  pick another one with `--port`.
+* Subtitles are burned in only for input files that are not mkv; for mkv,
+  Mkchromecast says so and casts without them.
 
 You can also check the [FAQ](https://github.com/muammar/mkchromecast/wiki/FAQ)
 for more information.
@@ -763,6 +776,8 @@ TODO
 ----
 
 * Verify all exceptions when the system tray menu fails.
+* **Packaging**: a `debian/` directory, so the `.deb` can be built with
+  `dpkg-buildpackage` rather than with `packaging/build-deb.sh`.
 * **Sonos**: reconnect `_DisabledSonosCasting` so speakers can be driven again.
 * **Sonos**: add support to different available flags.
 * **Sonos**: add Equalizer in the controls.

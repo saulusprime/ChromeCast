@@ -41,6 +41,19 @@ testato al posto di codice disabilitato.
 
 ---
 
+## Packaging Debian con debhelper
+
+`make deb` costruisce un pacchetto valido con `dpkg-deb`
+([`packaging/build-deb.sh`](packaging/build-deb.sh)), verificato e installato
+su questa macchina. Non è però packaging Debian *canonico*: manca la directory
+`debian/` (`control`, `rules`, `changelog`, `copyright`, `source/format`) che
+servirebbe per `dpkg-buildpackage` e per proporre il pacchetto a valle.
+
+Richiede `debhelper` e `dh-python`, che qui non sono installati. È lavoro
+opzionale: serve solo se il pacchetto deve uscire da questa macchina.
+
+---
+
 ## Limitazioni note, dichiarate nel codice
 
 Non sono difetti da correggere ma scelte in attesa, già segnalate all'utente
