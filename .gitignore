@@ -7,3 +7,10 @@ dist
 install
 .idea
 **__pycache__
+.pybuild
+debian/.debhelper
+debian/debhelper-build-stamp
+debian/files
+debian/mkchromecast
+debian/*.substvars
+debian/*.debhelper.log

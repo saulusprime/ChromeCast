@@ -1,0 +1,28 @@
+# These patterns replace dpkg-source's own list rather than adding to it, so
+# the version control directory has to be named here: without it the source
+# package carried .git, and weighed 350 MB instead of 8.
+tar-ignore = .git
+tar-ignore = .svn
+tar-ignore = .hg
+tar-ignore = .bzr
+tar-ignore = CVS
+tar-ignore = _darcs
+
+# Build artefacts and the developer's virtualenv, which are not source.
+tar-ignore = .venv
+tar-ignore = .vscode
+tar-ignore = .pybuild
+tar-ignore = build
+tar-ignore = dist
+tar-ignore = *.egg-info
+tar-ignore = __pycache__
+tar-ignore = *.pyc
+
+# macOS-only, and third-party. archive/ holds audiodevice, whose sources are
+# marked "Copyright 2006 Rogue Amoeba Software, LLC. All rights reserved."
+# with no licence grant; notifier/ holds terminal-notifier, whose LICENSE
+# file only points at a URL. Neither is used on Linux, neither is installed,
+# and neither can be redistributed on a stated licence, so neither belongs in
+# a source package meant to be handed on.
+tar-ignore = archive
+tar-ignore = notifier

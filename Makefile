@@ -27,14 +27,22 @@
 #     pactl, ffmpeg, lame and friends still have to come from the
 #     distribution.  See the dependency list in README.md.
 #
-# What "deb" builds
-# =================
-#     make deb  ->  dist/mkchromecast_X.Y.Z-1local1_all.deb, a package for the
-#                   system Python that depends on the distribution's python3-*
-#                   packages.  This is the only build that can replace the
-#                   distribution's own /usr/bin/mkchromecast.
+# The two .deb builds
+# ===================
+#     make deb   ->  dist/mkchromecast_X.Y.Z-1local1_all.deb, built with
+#                    dpkg-deb by packaging/build-deb.sh.  Needs nothing beyond
+#                    dpkg-dev, so it works on any machine; use it to try a
+#                    change on the installed copy.
 #
-#     See packaging/build-deb.sh for what goes in it and why.
+#     make dist  ->  ../mkchromecast_X.Y.Z_all.deb and the source package,
+#                    built with dpkg-buildpackage from debian/.  This is the
+#                    one to hand to somebody else: it carries a maintainer
+#                    who can be reached, a DEP-5 copyright, and a source
+#                    package anyone can rebuild.  Needs debhelper, dh-python
+#                    and python3-all; make lint also needs lintian.
+#
+#     Both install the same files.  The Debian revision only differs so that
+#     the two do not shadow each other in apt.
 #
 # Muammar El Khatib
 #
@@ -58,6 +66,9 @@ ARGS ?=
         check \
         wheel \
         deb \
+        dist \
+        dist-source \
+        lint \
         binary \
         install \
         develop \
@@ -78,7 +89,10 @@ help:
 	@echo "Linux:"
 	@echo "  check        run the unit test suite"
 	@echo "  wheel        build $(DISTDIR)/mkchromecast-*.whl"
-	@echo "  deb          build $(DISTDIR)/mkchromecast_*_all.deb"
+	@echo "  deb          build $(DISTDIR)/mkchromecast_*_all.deb with dpkg-deb"
+	@echo "  dist         build the distributable package from debian/"
+	@echo "  dist-source  build only the source package from debian/"
+	@echo "  lint         run lintian over what dist built"
 	@echo "  binary       build $(DISTDIR)/mkchromecast, a standalone executable"
 	@echo "  install      install into the virtualenv"
 	@echo "  develop      install into the virtualenv, editable"
@@ -116,6 +130,19 @@ wheel: require-linux
 # dpkg-dev.  DEB_REVISION overrides the Debian revision.
 deb: require-linux
 	packaging/build-deb.sh $(DISTDIR)
+
+# The distributable build.  dpkg-buildpackage writes to the parent directory,
+# which is where every Debian tool expects to find its output.
+dist: require-linux
+	dpkg-buildpackage -us -uc -ui
+
+dist-source: require-linux
+	dpkg-buildpackage -us -uc -S
+
+# --pedantic asks for everything lintian has an opinion about; -i explains
+# each tag rather than only naming it.
+lint: require-linux
+	lintian -i --pedantic ../mkchromecast_*.changes
 
 # The entry point puts the repo root on sys.path at runtime, which is too late
 # for PyInstaller to follow: --paths says where the package is.  Most of the

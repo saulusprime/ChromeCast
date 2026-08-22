@@ -119,9 +119,11 @@ elif platform.system() == "Linux":
         long_description=open(ROOT + "/README.md").read(),
         include_package_data=True,
         license="MIT",
-        url="http://mkchromecast.com/",
+        url="https://github.com/saulusprime/ChromeCast",
         author="Muammar El Khatib",
-        author_email="http://muammar.me/",
+        # Was "http://muammar.me/": a URL where an address belongs, which
+        # the Debian packaging carried into the Maintainer field.
+        author_email="muammar@debian.org",
         keywords=["chromecast"],
         # getch is imported by bin/mkchromecast for --control, so the
         # subpackage has to ship too: leaving it out made `--control` fail

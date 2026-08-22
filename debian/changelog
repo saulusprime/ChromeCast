@@ -1,0 +1,16 @@
+mkchromecast (0.4.4) resolute; urgency=medium
+
+  * Build with debhelper.  There is now a debian/ directory, so the package
+    can be built with dpkg-buildpackage and rebuilt by anyone who receives
+    the source, rather than only by packaging/build-deb.sh.
+  * Declare a maintainer who can be reached.  The field held an upstream
+    name with a URL where the address belongs, which is not a valid
+    Maintainer and is not who builds these packages.
+  * Leave the macOS-only trees out of the source package.  archive/ carries
+    audiodevice, whose sources say "Copyright 2006 Rogue Amoeba Software,
+    LLC. All rights reserved." with no licence grant, and notifier/ states
+    its licence only by pointing at a URL.  Neither is used on Linux.
+  * Record third-party copyright properly: py-getch under mkchromecast/getch
+    and the nodejs streamer each get their own paragraph.
+
+ -- saulusprime <pierno.paolo@gmail.com>  Sat, 22 Aug 2026 09:48:27 +0200

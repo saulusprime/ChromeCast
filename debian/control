@@ -1,0 +1,48 @@
+Source: mkchromecast
+Section: sound
+Maintainer: saulusprime <pierno.paolo@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools
+Standards-Version: 4.7.0
+Homepage: https://github.com/saulusprime/ChromeCast
+Vcs-Git: https://github.com/saulusprime/ChromeCast.git
+Vcs-Browser: https://github.com/saulusprime/ChromeCast
+
+Package: mkchromecast
+Architecture: all
+Depends: ${python3:Depends},
+         ${misc:Depends},
+         pulseaudio-utils,
+         python3-flask,
+         python3-ifaddr,
+         python3-psutil,
+         python3-pychromecast (>= 14),
+         python3-pyqt5,
+         python3-requests
+Recommends: ffmpeg,
+            flac,
+            lame,
+            opus-tools,
+            sox,
+            vorbis-tools
+Suggests: nodejs,
+          pavucontrol,
+          python3-gi,
+          yt-dlp
+Description: cast Linux audio or video to Google Cast devices
+ Mkchromecast streams what the computer is playing, or a video file, to
+ Google Cast devices on the local network. Audio is captured with parec and
+ encoded as it goes; mp3, ogg, opus, flac and wav are supported, with ffmpeg
+ available as an alternative encoder backend.
+ .
+ It can be driven from the command line or from a system tray menu, which
+ finds the devices on the network, casts to the one chosen and offers volume
+ and playback controls. YouTube and other sites supported by yt-dlp can be
+ cast by URL, and video files can be cast with subtitles burned in.
+ .
+ This is the saulusprime fork, which carries fixes for running on current
+ Linux systems: PipeWire, pychromecast 14 and Python 3.14. Sonos casting is
+ not available; the code that drove those speakers is present but
+ disconnected.

@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+# This file is part of mkchromecast.
+
+export PYBUILD_NAME = mkchromecast
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+# The dependencies are declared in debian/control against the distribution's
+# own python3-* packages.  Left to itself, dh_python3 reads install_requires
+# out of the egg-info and adds what it can map, which here means guessing at
+# soco -- a dependency of the Sonos code that is disconnected and that Debian
+# does not package.
+override_dh_python3:
+	dh_python3 --no-guessing-deps
+
+# Part of the suite checks files that live in the source tree -- the desktop
+# entry, the icon that its Icon= key names -- and locates them relative to
+# tests/.  pybuild runs the tests from a copy holding only the package, where
+# those files are absent, so the suite runs here instead, exactly as
+# `make check` does.
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	cd $(CURDIR) && python3 -m unittest discover -s tests
+endif
