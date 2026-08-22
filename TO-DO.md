@@ -4,7 +4,7 @@
 percorsi che il codice stesso dichiarava rotti. Il registro completo, con
 sintomo, causa, prova raccolta e fix per ognuno, è in [AS-IS.md](AS-IS.md).
 
-Suite di test: **62 casi**, tutti verdi (erano 33 all'inizio, 46 dopo
+Suite di test: **66 casi**, tutti verdi (erano 33 all'inizio, 46 dopo
 l'analisi Ubuntu).
 
 ---
@@ -72,7 +72,7 @@ quando le incontra:
 Per qualunque intervento futuro:
 
 ```bash
-# la suite deve restare verde (baseline attuale: 62/62)
+# la suite deve restare verde (baseline attuale: 66/66)
 python -m unittest discover -s tests -v
 ```
 

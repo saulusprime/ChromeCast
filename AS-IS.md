@@ -7,8 +7,9 @@ fix applicato**, con il commit che lo introduce.
 Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 
 **Stato:** tutti i problemi individuati sono chiusi, e con loro i tre percorsi
-che il codice stesso dichiarava rotti (#11, #12, #13) e le promesse su Sonos
-che il codice non manteneva (#14). Suite di test da 33 a **62** casi.
+che il codice stesso dichiarava rotti (#11, #12, #13), le promesse su Sonos
+che il codice non manteneva (#14) e due difetti emersi impacchettando
+(#15, #16). Suite di test da 33 a **66** casi.
 
 ## Ambiente di prova
 
@@ -784,6 +785,65 @@ quadre, apici e backslash.
 sottotitoli da soli, risoluzione da sola, e insieme con un file chiamato
 `we,ird: [it's] a sub.srt`: tutti e tre completano senza errori.
 
+### #15 — `--control` rotto in ogni copia installata  ✅ `f160fb52`
+
+**Sintomo.** Con `--control`, il primo tasto premuto alza
+`ModuleNotFoundError: No module named 'mkchromecast.getch'`. Solo sulle copie
+**installate**: dall'albero di lavoro funziona.
+
+**Causa.** [`setup.py`](setup.py) dichiarava `packages=["mkchromecast"]`, che
+**non** include i sottopacchetti: né il wheel né il `.deb` contenevano
+`mkchromecast/getch/`, importato da
+[`bin/mkchromecast`](bin/mkchromecast) in `block_until_exit()`.
+
+Il `.deb` lo escludeva per di più di proposito, sulla base di una ricerca
+sbagliata: `grep -r "getch" --include="*.py"` non può trovare
+`bin/mkchromecast`, che non ha estensione.
+
+**Prova.**
+```console
+$ cd /tmp && python3 -c "from mkchromecast.getch import getch"
+ModuleNotFoundError: No module named 'mkchromecast.getch'
+```
+
+**Fix.** `packages=["mkchromecast", "mkchromecast.getch"]` e niente più
+esclusione in [`packaging/build-deb.sh`](packaging/build-deb.sh). Verificato
+importando `getch` dal `.deb` estratto, col python3 di sistema.
+
+**Insieme, tre derive di `bin/mkchromecast`** rispetto ai moduli:
+`--reset` e `--version` giravano fuori dal `try`, quindi un `pactl` assente
+usciva come traceback mentre lo stesso errore altrove era una riga; il tasto
+`a` stampava la lista device grezza, che da quando è fatta di dataclass
+significa una fila di `AvailableDevice(...)`; e l'import di `typing` era
+avanzato da dichiarazioni spostate nel corpo della classe.
+
+### #16 — `pactl` presente ma irraggiungibile: traceback  ✅ `PENDING`
+
+**Sintomo.** `mkchromecast --reset` da un contesto senza sessione audio (login
+ssh, unità systemd) esce con
+`subprocess.CalledProcessError: Command '['pactl', 'list', 'sinks']' returned
+non-zero exit status 1`.
+
+**Causa.** [`pulseaudio.py`](mkchromecast/pulseaudio.py), `_pactl()`:
+`FileNotFoundError` diventava `PulseAudioNotAvailable`, ma un `pactl` che c'è e
+non riesce a parlare col server no — pur essendo il caso che la docstring
+dell'eccezione dichiarava già ("*not installed or cannot be reached*").
+
+**Prova.**
+```console
+$ env -i PATH=/usr/bin:/bin pactl list sinks
+Connection failure: Connection refused
+```
+
+**Fix.** `_pactl()` riconosce il fallimento di connessione — il messaggio è in
+inglese qualunque sia il locale, perché `_PACTL_ENV` lo fissa — e lo riporta
+come `PulseAudioNotAvailable`; idem per un `pactl` che non risponde entro il
+timeout. Gli altri errori di comando restano `CalledProcessError`, per non
+travestire da server irraggiungibile un fallimento che non lo è. Quattro test
+nuovi in `tests/test_pulseaudio.py`.
+
+**Trovato verificando l'installazione del `.deb`, non da un test.**
+
 ### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
 
 **Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
@@ -849,6 +909,8 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #12 | Riconnessione node a catena di processi | `36b71830` |
 | #13 | `-vf` doppio; sottotitoli mai funzionanti su non-mkv | `46bf7d75` |
 | #14 | Sonos pubblicizzato ma assente | `7b38c65d` |
+| #15 | `getch` non impacchettato: `--control` rotto una volta installato | `f160fb52` |
+| #16 | `pactl` irraggiungibile: traceback invece di un messaggio | vedi sotto |
 
 ---
 
@@ -878,7 +940,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 > la forma con percorsi assoluti funziona da qualunque directory.
 
 ```bash
-# 1. i test devono restare verdi (33 prima dei fix, 62 dopo)
+# 1. i test devono restare verdi (33 prima dei fix, 66 dopo)
 python -m unittest discover -s tests -v
 
 # 2. discovery: output visibile anche in pipe, exit code 0

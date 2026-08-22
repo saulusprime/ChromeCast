@@ -37,6 +37,25 @@ def _pactl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
             "`sudo apt install pulseaudio-utils`), or select an ALSA device "
             "with --alsa-device."
         ) from e
+    except subprocess.CalledProcessError as e:
+        # pactl is installed but has nobody to talk to: no audio server
+        # running, or no session to reach it through, which is what an ssh
+        # login or a systemd unit typically gets.  The message is in English
+        # whatever the user's locale, since _PACTL_ENV pins it.
+        stderr = (e.stderr or b"").decode("utf-8", "replace")
+        if "Connection failure" not in stderr:
+            raise
+        raise PulseAudioNotAvailable(
+            "pactl could not reach the audio server "
+            f"({stderr.strip().splitlines()[0]}). Check that PulseAudio or "
+            "PipeWire is running for this session, or select an ALSA device "
+            "with --alsa-device."
+        ) from e
+    except subprocess.TimeoutExpired as e:
+        raise PulseAudioNotAvailable(
+            "pactl did not answer within 60 seconds; the audio server is not "
+            "responding."
+        ) from e
 
 
 def create_sink() -> None:

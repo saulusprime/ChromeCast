@@ -32,7 +32,11 @@
     - The `Makefile` gained Linux targets: `check`, `wheel`, `deb`,
       `binary` (PyInstaller), `install`, `develop`, `run`, `clean-build`.
       `make` no longer edits the source.
-    - Test suite from 33 to 62 cases.
+    - `--control` works on installed copies: the getch subpackage was
+      never shipped, so any control key raised ModuleNotFoundError.
+    - `pactl` that cannot reach the audio server is reported in one line
+      rather than as a traceback.
+    - Test suite from 33 to 66 cases.
 
 * Mkchromecast (0.3.9) **unreleased**
 

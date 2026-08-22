@@ -11,7 +11,7 @@ in the Wiki.
 Before opening a pull request
 -----------------------------
 
-Run the test suite; it takes under a second and the baseline is 62 passing
+Run the test suite; it takes under a second and the baseline is 66 passing
 cases:
 
 ```
