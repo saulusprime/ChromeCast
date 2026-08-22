@@ -37,14 +37,14 @@ altrove.
 
 ## 🔴 P0 — Bloccanti  ✅ RISOLTI
 
-Corretti sul branch `fix/p0-blockers` (commit `d059f9d9`, `6d97a3de`,
-`80ffc734`). Le sezioni sotto restano come documentazione del problema.
+Corretti sul branch `fix/p0-blockers` (commit `f0b15875`, `b309b1ef`,
+`6d63251e`). Le sezioni sotto restano come documentazione del problema.
 Verifica: 33/33 test verdi, cast reale riuscito verso un Chromecast
 (`status_text='Trasmissione: Mkchromecast v0.3.9'`), nessun sink residuo. La
 sessione completa, con l'output riga per riga, è in
 [Prova completa: cast audio reale](#prova-completa-cast-audio-reale).
 
-### #1 — Il fallimento del bind di Flask non viene rilevato  ✅ `d059f9d9`
+### #1 — Il fallimento del bind di Flask non viene rilevato  ✅ `f0b15875`
 
 **Sintomo.** `mkchromecast -n <device>` sembra partire, il Chromecast si
 attiva, ma non esce audio.
@@ -138,7 +138,7 @@ def main():
 
 ---
 
-### #2 — Crash con pychromecast 14: `RequestFailed: Failed to execute play`  ✅ `6d97a3de`
+### #2 — Crash con pychromecast 14: `RequestFailed: Failed to execute play`  ✅ `b309b1ef`
 
 **Sintomo.** Traceback Python non gestito subito dopo l'avvio del cast.
 
@@ -211,7 +211,7 @@ codice (vedi anche #10).
 
 ---
 
-### #3 — `pip install PyGObject` fallisce → `import gi` non funziona  ✅ `80ffc734`
+### #3 — `pip install PyGObject` fallisce → `import gi` non funziona  ✅ `6d63251e`
 
 **Sintomo.** L'installazione dei requirements si interrompe. È il motivo per
 cui `PyGObject` è stato spostato in fondo a `requirements.txt` (modifica non
@@ -286,12 +286,12 @@ funzione `_notify(title, message)`.
 
 ## 🟠 P1 — Gravi  ✅ RISOLTI
 
-Corretti sul branch `fix/p0-blockers` (commit `6fcb4454`, `7dc8ec28`,
-`53c8b7ee`). Verifica: 35/35 test verdi, `--reset` pulisce i sink in
+Corretti sul branch `fix/p0-blockers` (commit `5fce6ff5`, `07b75001`,
+`2e30053e`). Verifica: 35/35 test verdi, `--reset` pulisce i sink in
 locale `it_IT`, `--discover | cat` mostra l'output ed esce 0,
 `--sample-rate 48000` serve davvero uno stream a 48000Hz.
 
-### #4 — `--reset` non rimuove i sink se il locale non è inglese  ✅ `7dc8ec28`
+### #4 — `--reset` non rimuove i sink se il locale non è inglese  ✅ `07b75001`
 
 **Sintomo.** I sink `Mkchromecast` si accumulano ad ogni crash e `--reset` non
 li pulisce.
@@ -353,7 +353,7 @@ residui. Applicare `_pactl()` anche a `create_sink`, `remove_sink` e
 
 ---
 
-### #5 — `findall(stringa, re.MULTILINE)` — il flag viene passato come `pos`  ✅ `7dc8ec28`
+### #5 — `findall(stringa, re.MULTILINE)` — il flag viene passato come `pos`  ✅ `07b75001`
 
 **Causa.** [`pulseaudio.py:94`](mkchromecast/pulseaudio.py#L94):
 
@@ -376,7 +376,7 @@ corretto        findall(s)               : ['536870916']
 
 ---
 
-### #6 — Sample rate incoerente fra `parec` e l'encoder  ✅ `53c8b7ee`
+### #6 — Sample rate incoerente fra `parec` e l'encoder  ✅ `2e30053e`
 
 **Sintomo.** Con `-c opus` l'audio si sente più veloce/acuto (~8.8%). Con
 `-c mp3` l'opzione `--sample-rate` non ha alcun effetto.
@@ -458,7 +458,7 @@ conseguenza.
 
 ---
 
-### #7 — Tutto l'output si perde quando si redirige; exit code sempre 137  ✅ `6fcb4454`
+### #7 — Tutto l'output si perde quando si redirige; exit code sempre 137  ✅ `5fce6ff5`
 
 **Sintomo.**
 ```console
@@ -516,11 +516,11 @@ Aggiungere `import sys` in `utils.py`.
 
 ## 🟡 P2 — Bug certi, non raggiunti dal percorso Linux di default  ✅ RISOLTI
 
-Corretti in `c0072fa6`. Nel farlo è emerso che il comando node aveva la
+Corretti in `bb8ec183`. Nel farlo è emerso che il comando node aveva la
 porta hardcoded a 5000 mentre `cast.py` costruisce l'URL da `--port`:
 corretto insieme.
 
-### #8 — `node.py`: `UnboundLocalError` su `bitrate` e `samplerate`  ✅ `c0072fa6`
+### #8 — `node.py`: `UnboundLocalError` su `bitrate` e `samplerate`  ✅ `bb8ec183`
 
 [`node.py:41-51`](mkchromecast/node.py#L41-L51) dichiara i tipi ma non assegna
 mai i valori prima dell'uso:
@@ -570,7 +570,7 @@ if tray_config:
         self.backend = backend_options[0]
 ```
 
-### #9 — Node non viene trovato su Ubuntu  ✅ `c0072fa6`
+### #9 — Node non viene trovato su Ubuntu  ✅ `bb8ec183`
 
 [`node.py:56`](mkchromecast/node.py#L56) cerca solo in percorsi hardcoded:
 
@@ -589,7 +589,7 @@ Stessa logica già presente e corretta in
 [`video.py:86-104`](mkchromecast/video.py#L86-L104), che usa `utils.is_installed`
 sul `PATH`: uniformare le due.
 
-### #10 — `Chromecast.device` è stato rimosso in pychromecast 14  ✅ `c0072fa6`
+### #10 — `Chromecast.device` è stato rimosso in pychromecast 14  ✅ `bb8ec183`
 
 [`cast.py`](mkchromecast/cast.py), in
 `_DisabledSonosCasting.get_devices`, fa `print(self.cast.device)`.
@@ -603,7 +603,7 @@ già marcata come rotta, ma va sistemato quando la si riabilita.
 
 ## 🔵 P3 — Minori / robustezza  ✅ RISOLTI
 
-- ✅ `a9936424` — **`Mkchromecast` istanziato sei volte all'import.** `audio.py`,
+- ✅ `f30a024a` — **`Mkchromecast` istanziato sei volte all'import.** `audio.py`,
   `preferences.py`, `tray_threading.py` e `systray.py` ne costruivano uno
   ciascuno, quindi ogni avvio faceva sei volte il parsing della riga di
   comando e il caricamento del file di configurazione. Ora la costruzione
@@ -625,41 +625,41 @@ già marcata come rotta, ma va sistemato quando la si riabilita.
   non faceva nulla. Ora il sink viene prima cercato. Verificato uccidendo
   il padre con SIGKILL: prima il sink sopravviveva.
 
-- ✅ `81bd771f` — **`check_sink()` ritornava `None` se `pactl` mancava**, e
+- ✅ `68628ffc` — **`check_sink()` ritornava `None` se `pactl` mancava**, e
   l'unico chiamante testava `is False`: l'assenza di `pactl` veniva quindi
   letta come "il sink esiste già" e non se ne creava mai uno. Ora l'assenza è
   un `PulseAudioNotAvailable` esplicito, con il pacchetto da installare; la
   CLI lo trasforma in una riga di errore ed esce 1, la tray segna il
   tentativo come fallito senza morire.
 
-- ✅ `7dc8ec28` — **`create_sink()` non verificava l'esito.** Ora controlla il
+- ✅ `07b75001` — **`create_sink()` non verificava l'esito.** Ora controlla il
   return code e l'indice del modulo, e `remove_sink()` è idempotente.
 
-- ✅ `68b4a0d8` — **Icone della tray legate alla CWD.** Risolte a partire dalla
+- ✅ `621f0ca9` — **Icone della tray legate alla CWD.** Risolte a partire dalla
   directory del package, poi da `/usr/share`, poi dalla CWD per il bundle
   macOS. Verificato da `/`, `/tmp` e dal repo.
 
-- ✅ `81bd771f` — **`global cast` ribindato da modulo a oggetto.** Ora è un
+- ✅ `68628ffc` — **`global cast` ribindato da modulo a oggetto.** Ora è un
   attributo del `Player`, che è anche come la tray lo rilegge.
 
-- ✅ `81bd771f` — **`or None` senza effetto e confronto di versioni fra
+- ✅ `68628ffc` — **`or None` senza effetto e confronto di versioni fra
   stringhe** (che metteva `0.3.9` sopra `0.3.10`), con il tag estratto via
   `str.strip`. Ora si legge il JSON e si confronta con
   `utils.version_tuple`, coperta da test.
 
-- ✅ `536f7d73` — **`backend_handler` uccideva processi non suoi.** Niente più
+- ✅ `3be8d65f` — **`backend_handler` uccideva processi non suoi.** Niente più
   `pkill -f ffmpeg`: si percorre il proprio albero di processi con `psutil`.
   Verificato che un ffmpeg estraneo resti `running` mentre il nostro passa a
   `stopped`.
 
-- ✅ `9004388b` — **`setup.py` non dichiarava le dipendenze.** `requires=` →
+- ✅ `6042c436` — **`setup.py` non dichiarava le dipendenze.** `requires=` →
   `install_requires=`, elenco corretto (mancavano pychromecast e soco, c'era
   `mutagen` che non è importato da nessuna parte), `python_requires=">=3.9"`.
 
-- ✅ `9004388b` — **`netifaces` sostituito con `ifaddr`**, già presente come
+- ✅ `6042c436` — **`netifaces` sostituito con `ifaddr`**, già presente come
   dipendenza di `zeroconf`. Niente più compilazione durante `pip install`.
 
-- ✅ `536f7d73` — **`audio.py` non risolveva davvero il backend.** Ora
+- ✅ `3be8d65f` — **`audio.py` non risolveva davvero il backend.** Ora
   `shutil.which` in ogni modalità, con errore chiaro se il backend non c'è;
   i percorsi hardcoded restano solo su Darwin per il bundle `.app`.
 
@@ -673,7 +673,7 @@ Non facevano parte dell'analisi Ubuntu: erano difetti preesistenti che il
 sorgente segnalava da sé, con un `raise` messo lì apposta al posto della
 logica mancante.
 
-### #11 — Un indice di device sbagliato faceva morire l'applicazione  ✅ `ee33dc84`
+### #11 — Un indice di device sbagliato faceva morire l'applicazione  ✅ `c2e51683`
 
 **Sintomo.** Con `-s`, digitando un indice fuori dall'elenco, l'applicazione
 alzava `Exception: Internal error: Never worked; needs to be fixed.`
@@ -716,7 +716,7 @@ $ ... < /dev/null                   # stdin chiuso
 No index was given: standard input is closed.   # exit 1
 ```
 
-### #12 — La riconnessione del backend node poteva generare processi a catena  ✅ `36b71830`
+### #12 — La riconnessione del backend node poteva generare processi a catena  ✅ `23589033`
 
 **Sintomo.** Quando il server node moriva, il percorso di riconnessione alzava
 `Internal error: Never worked; needs to be fixed.`
@@ -745,7 +745,7 @@ stati rimossi.
 macOS e node non è fra i backend audio Linux. Il limite, la politica di
 recasting e il recupero del budget sono coperti da test.
 
-### #13 — `-vf` specificato due volte, e sottotitoli mai funzionanti su file non-mkv  ✅ `46bf7d75`
+### #13 — `-vf` specificato due volte, e sottotitoli mai funzionanti su file non-mkv  ✅ `9fbf7685`
 
 **Sintomo dichiarato.** Usando insieme `--subtitles` e `--resolution` su un
 file non-mkv, ffmpeg riceveva `-vf` due volte e ne ignorava uno.
@@ -787,7 +787,7 @@ quadre, apici e backslash.
 sottotitoli da soli, risoluzione da sola, e insieme con un file chiamato
 `we,ird: [it's] a sub.srt`: tutti e tre completano senza errori.
 
-### #15 — `--control` rotto in ogni copia installata  ✅ `f160fb52`
+### #15 — `--control` rotto in ogni copia installata  ✅ `4a42ff5b`
 
 **Sintomo.** Con `--control`, il primo tasto premuto alza
 `ModuleNotFoundError: No module named 'mkchromecast.getch'`. Solo sulle copie
@@ -819,7 +819,7 @@ usciva come traceback mentre lo stesso errore altrove era una riga; il tasto
 significa una fila di `AvailableDevice(...)`; e l'import di `typing` era
 avanzato da dichiarazioni spostate nel corpo della classe.
 
-### #16 — `pactl` presente ma irraggiungibile: traceback  ✅ `e124d828`
+### #16 — `pactl` presente ma irraggiungibile: traceback  ✅ `91676323`
 
 **Sintomo.** `mkchromecast --reset` da un contesto senza sessione audio (login
 ssh, unità systemd) esce con
@@ -846,7 +846,7 @@ nuovi in `tests/test_pulseaudio.py`.
 
 **Trovato verificando l'installazione del `.deb`, non da un test.**
 
-### #17 — L'icona della tray non seguiva il tema scuro  ✅ `59a5b788`
+### #17 — L'icona della tray non seguiva il tema scuro  ✅ `4a99e5d5`
 
 **Sintomo.** Con il desktop Ubuntu in tema scuro, l'icona nella barra
 superiore è quasi invisibile: è nera su fondo trasparente.
@@ -892,7 +892,7 @@ QPlatformNativeInterface::systemTrayWindowChanged`). Sono coperti da test la
 rilevazione del tema, la risoluzione della variante e il ridisegno al cambio
 di tema.
 
-### #18 — Nessuna icona nella griglia delle applicazioni  ✅ `4b8c388a`
+### #18 — Nessuna icona nella griglia delle applicazioni  ✅ `c8234132`
 
 **Sintomo.** In "Mostra applicazioni" di Ubuntu compare il nome
 *Mkchromecast* senza icona.
@@ -928,7 +928,7 @@ richiesta 256px -> .../hicolor/256x256/apps/mkchromecast.png
 verificano che l'icona nominata dall'entry esista, sia quadrata e sia
 installata dove il tema la cerca.
 
-### #19 — Scegliere un dispositivo chiudeva l'applicazione  ✅ `00fcb4c5`
+### #19 — Scegliere un dispositivo chiudeva l'applicazione  ✅ `ac90210a`
 
 **Sintomo.** Dalla tray: si avvia la scansione, compaiono i due dispositivi,
 se ne sceglie uno e dopo circa un secondo l'applicazione sparisce. Nessuna
@@ -971,7 +971,7 @@ APPLICAZIONE ANCORA VIVA
 
 CLI invariata: stesso messaggio, `exit=1`, nessun sink residuo.
 
-### #20 — Il motivo del fallimento non arrivava all'utente  ✅ `494f1c7e`
+### #20 — Il motivo del fallimento non arrivava all'utente  ✅ `0dcef0eb`
 
 **Sintomo.** La notifica diceva `Streaming Process Failed. Try Again...`.
 Riprovare non poteva funzionare: la porta sarebbe rimasta occupata.
@@ -983,7 +983,7 @@ da fallimento; il motivo veniva stampato su stdout, che sotto un lanciatore
 **Fix.** Il motivo viaggia col segnale `pcastready` e finisce nella notifica.
 Quando non se ne conosce uno resta il messaggio generico di prima.
 
-### #21 — La porta non era raggiungibile dalla tray  ✅ `1332d261`
+### #21 — La porta non era raggiungibile dalla tray  ✅ `bd90127b`
 
 **Sintomo.** Corretto #19, la tray sopravvive ma su questa macchina non casta
 comunque: la 5000 è occupata e dalla griglia delle applicazioni non c'è modo
@@ -1020,7 +1020,7 @@ Due difetti emersi mentre si lavorava qui, corretti insieme:
 - **`html5-video-streamer.js` ignorava `--port`**: ascoltava su 5000 fisso
   mentre `cast.py` costruiva l'URL da `mkcc.port`, quindi il dispositivo
   chiedeva una porta su cui non c'era nessuno. È lo stesso difetto che
-  `webcast.js` aveva e che era già stato corretto in `c0072fa6`. Verificato:
+  `webcast.js` aveva e che era già stato corretto in `bb8ec183`. Verificato:
   `node html5-video-streamer.js film.mp4 5123` risponde `200` sulla 5123.
 - **Il tasto "Reset Settings" non aveva mai funzionato**:
   [`preferences.py`](mkchromecast/preferences.py) chiamava
@@ -1030,7 +1030,7 @@ Due difetti emersi mentre si lavorava qui, corretti insieme:
   Il metodo alzava `AttributeError` alla prima riga. Ora `Config` ha un
   `write_defaults()` e il pulsante riporta tutto ai default, porta compresa.
 
-### #22 — Il cursore del volume alzava `TypeError`  ✅ `b99716c8`
+### #22 — Il cursore del volume alzava `TypeError`  ✅ `5086a8b1`
 
 **Sintomo.** Dalla tray, la voce *Volume* non apre niente e nel journal
 compare:
@@ -1054,7 +1054,7 @@ round(x)     -> 65       accettato, slider a 65
 ```
 
 **Perché salta fuori solo adesso.** Il ramo si raggiunge solo quando
-`self.cast` è davvero un `Chromecast`. Prima di `81bd771f` era il modulo
+`self.cast` è davvero un `Chromecast`. Prima di `68628ffc` era il modulo
 `cast` ribindato, e prima di #19 e #21 dalla tray non si arrivava a castare
 su questa macchina: `self.cast.status` alzava `AttributeError`, che il `try`
 intercettava, e il cursore partiva dal valore di ripiego. Il difetto è
@@ -1070,7 +1070,7 @@ compare su `pychromecast.Chromecast` ma viene legato sull'istanza in
 `__init__` (`self.set_volume = receiver_controller.set_volume`), quindi sia
 `value_changed()` sia `Casting.volume_up()`/`volume_down()` funzionano.
 
-### #23 — Uscire non usciva, e faceva partire una ricerca  ✅ `c667a206`
+### #23 — Uscire non usciva, e faceva partire una ricerca  ✅ `08cf366c`
 
 **Sintomo.** Cliccando *Quit* l'applicazione non si chiude e si mette a
 cercare i dispositivi. Nel journal:
@@ -1120,7 +1120,7 @@ rimasto è `_get_chromecast()` dentro `_DisabledSonosCasting`
 ([`cast.py:692`](mkchromecast/cast.py#L692)), cioè nel codice Sonos già
 disabilitato e in backlog.
 
-### #24 — Il pacchetto non era in condizione di essere distribuito  ✅ `b46bb5da`
+### #24 — Il pacchetto non era in condizione di essere distribuito  ✅ `6063b060`
 
 **Sintomo.** `make deb` produceva un `.deb` valido e installabile, ma non
 consegnabile a nessun altro: nessun pacchetto sorgente da ricostruire, e un
@@ -1188,7 +1188,7 @@ $ md5sum <i due .deb> | awk '{print $1}' | uniq -c
 Il pacchetto ricostruito dal sorgente è **identico byte per byte** a quello
 costruito dall'albero di lavoro.
 
-### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
+### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `677a4329`
 
 **Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
 offrivano il cast verso gli speaker Sonos; il README spiegava anche come
@@ -1233,36 +1233,36 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 
 | | Problema | Commit |
 |---|---|---|
-| #1 | Fallimento del bind di Flask non rilevato | `d059f9d9` |
-| #2 | Crash `RequestFailed` con pychromecast 14 | `6d97a3de` |
-| #3 | `PyGObject` non installabile su Ubuntu 26.04 | `80ffc734` |
-| #4 | `--reset` inefficace in locale non inglese | `7dc8ec28` |
-| #5 | `findall` con il flag passato come `pos` | `7dc8ec28` |
-| #6 | Sample rate incoerente fra `parec` e l'encoder | `53c8b7ee` |
-| #7 | Output perso in pipe, exit code sempre 137 | `6fcb4454` |
-| #8 | `UnboundLocalError` in `node.py`; backend da config non validato | `c0072fa6` |
-| #9 | Node non trovato su Ubuntu; `--port` ignorato | `c0072fa6` |
-| #10 | `Chromecast.device` rimosso in pychromecast 14 | `c0072fa6` |
-| P3 | `pactl` mancante, `global cast`, updater | `81bd771f` |
-| P3 | Icone legate alla CWD, rumore di config | `68b4a0d8` |
-| P3 | `pkill` fuori dal nostro albero, `backend.path` | `536f7d73` |
-| P3 | `setup.py`, `netifaces` → `ifaddr` | `9004388b` |
-| P3 | Singleton `Mkchromecast`, effetti all'import di `audio.py` | `a9936424` |
-| — | Dipendenze di sistema nel README | `54a9598b` |
-| #11 | Indice di device sbagliato: niente riselezione | `ee33dc84` |
-| #12 | Riconnessione node a catena di processi | `36b71830` |
-| #13 | `-vf` doppio; sottotitoli mai funzionanti su non-mkv | `46bf7d75` |
-| #14 | Sonos pubblicizzato ma assente | `7b38c65d` |
-| #15 | `getch` non impacchettato: `--control` rotto una volta installato | `f160fb52` |
-| #16 | `pactl` irraggiungibile: traceback invece di un messaggio | `e124d828` |
-| #17 | Icona della tray nera su tema scuro | `59a5b788` |
-| #18 | Nessuna icona nella griglia delle applicazioni | `4b8c388a` |
-| #19 | La tray moriva quando la porta era occupata | `00fcb4c5` |
-| #20 | La notifica non diceva perché il cast era fallito | `494f1c7e` |
-| #21 | Porta non configurabile dalla tray; default a 5001 | `1332d261` |
-| #22 | `TypeError` aprendo il cursore del volume | `b99716c8` |
-| #23 | Quit non usciva e faceva partire una ricerca | `c667a206` |
-| #24 | Pacchetto non distribuibile: manutentore, sorgente, licenze | `b46bb5da` |
+| #1 | Fallimento del bind di Flask non rilevato | `f0b15875` |
+| #2 | Crash `RequestFailed` con pychromecast 14 | `b309b1ef` |
+| #3 | `PyGObject` non installabile su Ubuntu 26.04 | `6d63251e` |
+| #4 | `--reset` inefficace in locale non inglese | `07b75001` |
+| #5 | `findall` con il flag passato come `pos` | `07b75001` |
+| #6 | Sample rate incoerente fra `parec` e l'encoder | `2e30053e` |
+| #7 | Output perso in pipe, exit code sempre 137 | `5fce6ff5` |
+| #8 | `UnboundLocalError` in `node.py`; backend da config non validato | `bb8ec183` |
+| #9 | Node non trovato su Ubuntu; `--port` ignorato | `bb8ec183` |
+| #10 | `Chromecast.device` rimosso in pychromecast 14 | `bb8ec183` |
+| P3 | `pactl` mancante, `global cast`, updater | `68628ffc` |
+| P3 | Icone legate alla CWD, rumore di config | `621f0ca9` |
+| P3 | `pkill` fuori dal nostro albero, `backend.path` | `3be8d65f` |
+| P3 | `setup.py`, `netifaces` → `ifaddr` | `6042c436` |
+| P3 | Singleton `Mkchromecast`, effetti all'import di `audio.py` | `f30a024a` |
+| — | Dipendenze di sistema nel README | `17842266` |
+| #11 | Indice di device sbagliato: niente riselezione | `c2e51683` |
+| #12 | Riconnessione node a catena di processi | `23589033` |
+| #13 | `-vf` doppio; sottotitoli mai funzionanti su non-mkv | `9fbf7685` |
+| #14 | Sonos pubblicizzato ma assente | `677a4329` |
+| #15 | `getch` non impacchettato: `--control` rotto una volta installato | `4a42ff5b` |
+| #16 | `pactl` irraggiungibile: traceback invece di un messaggio | `91676323` |
+| #17 | Icona della tray nera su tema scuro | `4a99e5d5` |
+| #18 | Nessuna icona nella griglia delle applicazioni | `c8234132` |
+| #19 | La tray moriva quando la porta era occupata | `ac90210a` |
+| #20 | La notifica non diceva perché il cast era fallito | `0dcef0eb` |
+| #21 | Porta non configurabile dalla tray; default a 5001 | `bd90127b` |
+| #22 | `TypeError` aprendo il cursore del volume | `5086a8b1` |
+| #23 | Quit non usciva e faceva partire una ricerca | `08cf366c` |
+| #24 | Pacchetto non distribuibile: manutentore, sorgente, licenze | `6063b060` |
 
 ---
 
@@ -1357,8 +1357,8 @@ Cosa conferma, riga per riga:
 | `Running on ...:5001` seguito da `[Done]` | #1: il controllo della porta e l'attesa di readiness passano; con la 5000 occupata si sarebbe fermato con un errore invece di castare a vuoto |
 | `app_id=None` → `app_id='CC1AD845'` con `session_id` | #2: `block_until_active()` fa il suo lavoro. Con il codice originale qui usciva `RequestFailed: Failed to execute play` |
 | `GET /stream HTTP/1.1" 200` dal device | Il ricevitore apre davvero lo stream, non si limita ad accettare il comando |
-| `BackendInfo(name='parec', path='/usr/bin/parec')` | `536f7d73`: il backend è risolto sul PATH, non da percorsi fissi |
-| Ogni riga di impostazioni stampata **una volta sola** | `a9936424`: prima del passaggio a `forkserver` comparivano doppie, perché il processo di streaming re-importava `audio.py` |
+| `BackendInfo(name='parec', path='/usr/bin/parec')` | `3be8d65f`: il backend è risolto sul PATH, non da percorsi fissi |
+| Ogni riga di impostazioni stampata **una volta sola** | `f30a024a`: prima del passaggio a `forkserver` comparivano doppie, perché il processo di streaming re-importava `audio.py` |
 
 Il ritardo di mp3 su questo percorso resta quello noto (fino a ~8 s). Ora che
 il sample rate arriva davvero anche a `parec` (#6), `-c flac --sample-rate

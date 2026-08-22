@@ -21,7 +21,7 @@ irraggiungibile da un refactor in poi:
 che nessuno istanzia e il cui `play_cast()` alza prima di arrivare allo
 speaker.
 
-La documentazione ora lo dice apertamente (commit `7b38c65d`) invece di
+La documentazione ora lo dice apertamente (commit `677a4329`) invece di
 promettere una funzione assente, quindi **non c'è più niente di ingannevole**:
 resta solo il lavoro, se qualcuno lo vuole fare.
 
@@ -37,7 +37,7 @@ Cosa servirebbe:
    [`:452`](mkchromecast/systray.py#L452),
    [`:530`](mkchromecast/systray.py#L530)).
 4. Unificare le due `input_device()`: quella di `Casting` è stata sistemata
-   (`ee33dc84`), quella dentro `_DisabledSonosCasting` è ancora la copia
+   (`c2e51683`), quella dentro `_DisabledSonosCasting` è ancora la copia
    vecchia col [`raise`](mkchromecast/cast.py#L679).
 5. Decidere che fare di `soco`, che oggi è una dipendenza dichiarata in
    [`requirements.txt`](requirements.txt) e in
@@ -81,7 +81,7 @@ quando le incontra:
   `Subtitles with mkv are not supported yet.`
   ([`pipeline_builder.py:356`](mkchromecast/pipeline_builder.py#L356),
   `_input_file_subtitle`). I sottotitoli su file **non**-mkv funzionano da
-  `46bf7d75` — prima non funzionavano affatto.
+  `9fbf7685` — prima non funzionavano affatto.
 
 ---
 
