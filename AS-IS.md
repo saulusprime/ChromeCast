@@ -10,7 +10,7 @@ Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 che il codice stesso dichiarava rotti (#11, #12, #13), le promesse su Sonos
 che il codice non manteneva (#14), i due difetti emersi impacchettando
 (#15, #16) e i cinque segnalati usando l'applicazione sul desktop
-(#17, #18, #19, #20, #21). Suite di test da 33 a **107** casi.
+(#17, #18, #19, #20, #21, #22). Suite di test da 33 a **110** casi.
 
 ## Ambiente di prova
 
@@ -1029,6 +1029,46 @@ Due difetti emersi mentre si lavorava qui, corretti insieme:
   Il metodo alzava `AttributeError` alla prima riga. Ora `Config` ha un
   `write_defaults()` e il pulsante riporta tutto ai default, porta compresa.
 
+### #22 — Il cursore del volume alzava `TypeError`  ✅ `b99716c8`
+
+**Sintomo.** Dalla tray, la voce *Volume* non apre niente e nel journal
+compare:
+
+```
+File "/usr/lib/python3/dist-packages/mkchromecast/systray.py", line 551, in volume_cast
+    self.sl.setValue(round((self.cast.status.volume_level * self.maxvolset), 1))
+TypeError: setValue(self, a0: int): argument 1 has unexpected type 'float'
+```
+
+**Causa.** `round(x, 1)` restituisce un `float` anche quando il risultato è
+intero (`0.65 * 100` → `65.0`), e `QSlider.setValue` accetta solo `int`. La
+riga è upstream e non è mai stata corretta; il `try` attorno intercetta solo
+`AttributeError`, quindi il `TypeError` passava.
+
+**Prova.** Contro un `QSlider` vero:
+
+```console
+round(x, 1)  -> 65.0     RIFIUTATO: setValue(self, a0: int): argument 1 has unexpected type 'float'
+round(x)     -> 65       accettato, slider a 65
+```
+
+**Perché salta fuori solo adesso.** Il ramo si raggiunge solo quando
+`self.cast` è davvero un `Chromecast`. Prima di `81bd771f` era il modulo
+`cast` ribindato, e prima di #19 e #21 dalla tray non si arrivava a castare
+su questa macchina: `self.cast.status` alzava `AttributeError`, che il `try`
+intercettava, e il cursore partiva dal valore di ripiego. Il difetto è
+vecchio, l'esposizione è nuova.
+
+**Fix.** La conversione diventa `slider_value()`, una funzione di modulo che
+restituisce un `int`, coperta da test — la si può verificare senza display,
+mentre il resto del pannello no. Verificato anche sul percorso vero, con un
+`QSlider` reale e un dispositivo al 65%: `cursore aperto, valore: 65 su 100`.
+
+Il resto del percorso volume è stato controllato ed è sano: `set_volume` non
+compare su `pychromecast.Chromecast` ma viene legato sull'istanza in
+`__init__` (`self.set_volume = receiver_controller.set_volume`), quindi sia
+`value_changed()` sia `Casting.volume_up()`/`volume_down()` funzionano.
+
 ### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
 
 **Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
@@ -1101,6 +1141,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #19 | La tray moriva quando la porta era occupata | `00fcb4c5` |
 | #20 | La notifica non diceva perché il cast era fallito | `494f1c7e` |
 | #21 | Porta non configurabile dalla tray; default a 5001 | `1332d261` |
+| #22 | `TypeError` aprendo il cursore del volume | `b99716c8` |
 
 ---
 
@@ -1131,7 +1172,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 > la forma con percorsi assoluti funziona da qualunque directory.
 
 ```bash
-# 1. i test devono restare verdi (33 prima dei fix, 107 dopo)
+# 1. i test devono restare verdi (33 prima dei fix, 110 dopo)
 python -m unittest discover -s tests -v
 
 # 2. discovery: output visibile anche in pipe, exit code 0

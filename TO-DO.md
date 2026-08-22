@@ -4,7 +4,7 @@
 percorsi che il codice stesso dichiarava rotti. Il registro completo, con
 sintomo, causa, prova raccolta e fix per ognuno, è in [AS-IS.md](AS-IS.md).
 
-Suite di test: **107 casi**, tutti verdi (erano 33 all'inizio, 46 dopo
+Suite di test: **110 casi**, tutti verdi (erano 33 all'inizio, 46 dopo
 l'analisi Ubuntu, 87 dopo i difetti trovati usando l'applicazione).
 
 Quel che resta è un backlog vero: una funzione da riportare in vita, un
@@ -104,7 +104,7 @@ quando le incontra:
 Per qualunque intervento futuro:
 
 ```bash
-# la suite deve restare verde (baseline attuale: 107/107)
+# la suite deve restare verde (baseline attuale: 110/110)
 python -m unittest discover -s tests -v
 ```
 
