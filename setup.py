@@ -42,6 +42,9 @@ LINUX_DATA = [
     ),
     ("share/mkchromecast/images", glob("images/google*.png")),
     ("share/applications/", ["mkchromecast.desktop"]),
+    # Where the icon theme looks: the desktop entry names the icon
+    # "mkchromecast" rather than pointing at a path.
+    ("share/icons/hicolor/256x256/apps", ["images/mkchromecast.png"]),
     ("share/man/man1", ["mkchromecast.1"]),
 ]
 # Keep in sync with requirements.txt.  This list was missing pychromecast,

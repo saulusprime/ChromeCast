@@ -9,7 +9,7 @@ Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 **Stato:** tutti i problemi individuati sono chiusi, e con loro i tre percorsi
 che il codice stesso dichiarava rotti (#11, #12, #13), le promesse su Sonos
 che il codice non manteneva (#14) e due difetti emersi impacchettando
-(#15, #16). Suite di test da 33 a **83** casi.
+(#15, #16). Suite di test da 33 a **87** casi.
 
 ## Ambiente di prova
 
@@ -890,6 +890,42 @@ QPlatformNativeInterface::systemTrayWindowChanged`). Sono coperti da test la
 rilevazione del tema, la risoluzione della variante e il ridisegno al cambio
 di tema.
 
+### #18 — Nessuna icona nella griglia delle applicazioni  ✅ `PENDING`
+
+**Sintomo.** In "Mostra applicazioni" di Ubuntu compare il nome
+*Mkchromecast* senza icona.
+
+**Causa.** [`mkchromecast.desktop`](mkchromecast.desktop) diceva
+`Icon=/usr/share/pixmaps/mkchromecast.xpm`, un file che **nessun pacchetto
+installa** — né quello Debian né il nostro:
+
+```console
+$ find /usr/share/pixmaps /usr/share/icons -iname "*mkchrome*"
+$   # nulla
+```
+
+Inoltre un percorso assoluto è il modo sbagliato di nominare un'icona: vale
+solo per quel file e quella dimensione.
+
+**Fix.** L'entry ora dice `Icon=mkchromecast`, un nome di tema, e
+`images/mkchromecast.png` (256×256, quadrata, tratto azzurro su fondo
+trasparente, generata dalla variante `google_b`) viene installata in
+`/usr/share/icons/hicolor/256x256/apps/` sia da `setup.py` sia da
+[`packaging/build-deb.sh`](packaging/build-deb.sh). L'azzurro si legge sia su
+fondo chiaro sia su scuro, a differenza del nero della tray.
+
+**Prova.** Risoluzione via `Gtk.IconTheme` con `XDG_DATA_DIRS` puntato
+sull'albero del pacchetto estratto:
+
+```
+richiesta  48px -> .../hicolor/256x256/apps/mkchromecast.png
+richiesta 256px -> .../hicolor/256x256/apps/mkchromecast.png
+```
+
+`desktop-file-validate` passa. Quattro test in `tests/test_packaging.py`
+verificano che l'icona nominata dall'entry esista, sia quadrata e sia
+installata dove il tema la cerca.
+
 ### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
 
 **Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
@@ -958,6 +994,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #15 | `getch` non impacchettato: `--control` rotto una volta installato | `f160fb52` |
 | #16 | `pactl` irraggiungibile: traceback invece di un messaggio | `e124d828` |
 | #17 | Icona della tray nera su tema scuro | `59a5b788` |
+| #18 | Nessuna icona nella griglia delle applicazioni | vedi sotto |
 
 ---
 

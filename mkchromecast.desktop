@@ -4,6 +4,6 @@ Comment=Cast your Linux audio or video files to your Google cast devices
 Exec=/usr/bin/mkchromecast -t
 Terminal=false
 Type=Application
-Icon=/usr/share/pixmaps/mkchromecast.xpm
+Icon=mkchromecast
 Categories=AudioVideo;Audio;
 Keywords=audio;chromecast;google;cast;pychromecast;

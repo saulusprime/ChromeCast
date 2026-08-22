@@ -43,6 +43,7 @@ mkdir -p "$PKGDIR/DEBIAN" \
          "$PKGDIR/usr/bin" \
          "$PKGDIR/usr/lib/python3/dist-packages" \
          "$PKGDIR/usr/share/applications" \
+         "$PKGDIR/usr/share/icons/hicolor/256x256/apps" \
          "$PKGDIR/usr/share/man/man1" \
          "$PKGDIR/usr/share/mkchromecast/images" \
          "$PKGDIR/usr/share/mkchromecast/nodejs" \
@@ -68,6 +69,12 @@ cp "$REPO"/nodejs/package.json \
    "$REPO"/nodejs/html5-video-streamer.js \
    "$PKGDIR/usr/share/mkchromecast/nodejs/"
 cp "$REPO/mkchromecast.desktop" "$PKGDIR/usr/share/applications/"
+
+# The desktop entry names its icon "mkchromecast"; this is where the icon
+# theme looks for it.  Installing here also fires the hicolor-icon-theme
+# trigger, which refreshes the icon cache.
+cp "$REPO/images/mkchromecast.png" \
+   "$PKGDIR/usr/share/icons/hicolor/256x256/apps/"
 gzip -9nc "$REPO/mkchromecast.1" > "$PKGDIR/usr/share/man/man1/mkchromecast.1.gz"
 cp "$REPO/LICENSE" "$PKGDIR/usr/share/doc/mkchromecast/copyright"
 gzip -9nc "$REPO/changelog.md" > "$PKGDIR/usr/share/doc/mkchromecast/changelog.gz"

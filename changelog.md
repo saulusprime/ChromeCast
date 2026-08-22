@@ -47,7 +47,11 @@
       staying black on a dark panel, where it was very nearly invisible.
       The white artwork already shipped; choosing it was a manual
       preference. `Icon Colors` gains an `auto` value, now the default.
-    - Test suite from 33 to 83 cases.
+    - The application shows an icon in the desktop's application grid.
+      The desktop entry pointed at /usr/share/pixmaps/mkchromecast.xpm,
+      which no package installs; it now names the icon "mkchromecast" and
+      a square 256x256 icon is installed where icon themes look.
+    - Test suite from 33 to 87 cases.
 
 * Mkchromecast (0.3.9) **unreleased**
 
