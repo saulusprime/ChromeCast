@@ -154,7 +154,9 @@ if _mkcc.operation == OpMode.TRAY:
             self.qccolors.move(180 * self.scale_factor, 152 * self.scale_factor)
             self.qccolors.setMinimumContentsLength(7)
 
-            colors_list = ["black", "blue", "white"]
+            # "auto" follows the desktop's light/dark setting; the rest
+            # pin the icon to one variant.
+            colors_list = ["auto", "black", "blue", "white"]
             for color in colors_list:
                 self.qccolors.addItem(color)
             self.jump_to_item_or_start(self.qccolors, self.config.colors)

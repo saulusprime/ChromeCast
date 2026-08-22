@@ -80,7 +80,7 @@ class Config:
             BITRATE: 192,
             SAMPLERATE: 44100,
             NOTIFICATIONS: False,
-            COLORS: "black",
+            COLORS: "auto",
             SEARCH_AT_LAUNCH: False,
             ALSA_DEVICE: None,
         }

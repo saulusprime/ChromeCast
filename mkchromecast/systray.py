@@ -15,6 +15,7 @@ from mkchromecast import cast
 from mkchromecast import colors
 from mkchromecast import config
 from mkchromecast import preferences
+from mkchromecast import theme
 from mkchromecast import tray_threading
 from mkchromecast.audio_devices import inputint, outputint
 from mkchromecast.pulseaudio import remove_sink
@@ -91,6 +92,12 @@ def linux_notify(message: str) -> None:
     Notify.init("Mkchromecast")
     Notify.Notification.new(
         "Mkchromecast", message, "dialog-information").show()
+
+
+# How often the desktop is asked whether it went dark.  Ten seconds is far
+# below what anyone notices when they flip the theme, and the question costs a
+# few milliseconds.
+THEME_POLL_MS = 10_000
 
 
 # TODO(xsdg): Encapsulate this so that we don't do this work on import.
@@ -188,7 +195,9 @@ class menubar(QtWidgets.QMainWindow):
         self.w = QWidget()
 
         self.icon = QtGui.QIcon()
-        self.icon.addFile(icon_path(self.google[self.config.colors]))
+        self._icon_set = self.google
+        self._icon_color_shown = self._icon_color()
+        self.icon.addFile(icon_path(self.google[self._icon_color_shown]))
 
         super().__init__()
 
@@ -197,6 +206,14 @@ class menubar(QtWidgets.QMainWindow):
 
     def createUI(self):
         self.tray = QtWidgets.QSystemTrayIcon(self.icon)
+
+        # The desktop can switch between light and dark while we are running.
+        # Asking costs a few milliseconds, so a slow poll is cheaper than any
+        # of the ways of being told, all of which need extra dependencies.
+        self._theme_timer = QtCore.QTimer(self)
+        self._theme_timer.timeout.connect(self._follow_desktop_theme)
+        self._theme_timer.start(THEME_POLL_MS)
+
         self.menu = QtWidgets.QMenu()
         self.ag = QtWidgets.QActionGroup(self)
         self.search_menu()
@@ -268,8 +285,33 @@ class menubar(QtWidgets.QMainWindow):
         self.available_devices = available_devices
         self.cast_list()
 
+    def _icon_color(self) -> str:
+        """The icon variant to use: an explicit setting, or the desktop's."""
+        return theme.icon_color(self.config.colors, _mkcc.platform)
+
     def _set_generic_icon(self, icon_set: dict):
-        self.tray.setIcon(QtGui.QIcon(icon_path(icon_set[self.config.colors])))
+        # Remembered so the icon can be redrawn in another colour without the
+        # caller having to say which state it is in.
+        self._icon_set = icon_set
+        self._icon_color_shown = self._icon_color()
+        self.tray.setIcon(
+            QtGui.QIcon(icon_path(icon_set[self._icon_color_shown])))
+
+    def _follow_desktop_theme(self):
+        """Redraws the icon when the desktop switches between light and dark.
+
+        Without this, an icon chosen at startup stays black on a panel that
+        has since gone dark, where it is very nearly invisible.  Only the
+        colour is reconsidered; the state the icon is showing is untouched.
+        """
+        wanted = self._icon_color()
+        if wanted == self._icon_color_shown:
+            return
+
+        if _mkcc.debug:
+            print(f":::systray::: desktop theme changed, icon -> {wanted}")
+
+        self._set_generic_icon(self._icon_set)
 
     def set_icon_working(self):
         """docstring for fnamicon_working"""
@@ -324,7 +366,7 @@ class menubar(QtWidgets.QMainWindow):
             self.exit_menu()
         else:
             if _mkcc.platform == "Darwin" and self.config.notifications:
-                icon_name = self.google[self.config.colors]
+                icon_name = self.google[self._icon_color()]
                 if os.path.exists(f"images/{icon_name}.icns"):
                     noticon = f"images/{icon_name}.icns"
                 else:
@@ -680,7 +722,7 @@ class menubar(QtWidgets.QMainWindow):
 
     def search_notification(self):
         if _mkcc.platform == "Darwin" and self.config.notifications:
-            icon_name = self.google[self.config.colors]
+            icon_name = self.google[self._icon_color()]
             if os.path.exists(f"images/{icon_name}.icns"):
                 noticon = f"images/{icon_name}.icns"
             else:

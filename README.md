@@ -595,6 +595,13 @@ or
 mkchromecast -t
 ```
 
+The tray icon follows the desktop's light/dark setting: the artwork is black
+on a transparent background, which is invisible against a dark panel, so a
+dark desktop gets the white variant instead. It is checked while the tray
+runs, so switching the desktop theme changes the icon within a few seconds.
+To pin the icon to one variant, set **Icon Colors** in Preferences to
+`black`, `blue` or `white` rather than `auto`.
+
 The system tray application can perform all the actions from the aforementioned
 commands. To get an idea, please check the [Youtube video
 here](https://github.com/muammar/mkchromecast#macos).

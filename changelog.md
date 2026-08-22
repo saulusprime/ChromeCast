@@ -43,7 +43,11 @@
       never shipped, so any control key raised ModuleNotFoundError.
     - `pactl` that cannot reach the audio server is reported in one line
       rather than as a traceback.
-    - Test suite from 33 to 66 cases.
+    - The tray icon follows the desktop's light/dark setting instead of
+      staying black on a dark panel, where it was very nearly invisible.
+      The white artwork already shipped; choosing it was a manual
+      preference. `Icon Colors` gains an `auto` value, now the default.
+    - Test suite from 33 to 83 cases.
 
 * Mkchromecast (0.3.9) **unreleased**
 

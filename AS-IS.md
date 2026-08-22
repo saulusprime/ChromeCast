@@ -9,7 +9,7 @@ Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 **Stato:** tutti i problemi individuati sono chiusi, e con loro i tre percorsi
 che il codice stesso dichiarava rotti (#11, #12, #13), le promesse su Sonos
 che il codice non manteneva (#14) e due difetti emersi impacchettando
-(#15, #16). Suite di test da 33 a **66** casi.
+(#15, #16). Suite di test da 33 a **83** casi.
 
 ## Ambiente di prova
 
@@ -844,6 +844,52 @@ nuovi in `tests/test_pulseaudio.py`.
 
 **Trovato verificando l'installazione del `.deb`, non da un test.**
 
+### #17 — L'icona della tray non seguiva il tema scuro  ✅ `PENDING`
+
+**Sintomo.** Con il desktop Ubuntu in tema scuro, l'icona nella barra
+superiore è quasi invisibile: è nera su fondo trasparente.
+
+**Causa.** [`systray.py`](mkchromecast/systray.py) sceglieva la variante
+dell'icona da `config.colors`, una preferenza **manuale** con default
+`black`. Le varianti bianche esistevano già da sempre
+(`google_w.png`, `google_working_w.png`, `google_nodev_w.png`), ma nessuno le
+selezionava se non aprendo le preferenze.
+
+**Prova.** Media pesata sull'alfa del tratto, misurata con Qt:
+
+| file | RGB del tratto |
+|---|---|
+| `google.png` | (0, 0, 0) — nero |
+| `google_b.png` | (10, 158, 230) — azzurro |
+| `google_w.png` | (254, 254, 254) — bianco |
+
+e il desktop:
+```console
+$ gsettings get org.gnome.desktop.interface color-scheme
+'prefer-dark'
+```
+
+**Fix.** Nuovo modulo [`theme.py`](mkchromecast/theme.py) che chiede al
+desktop se è scuro: `color-scheme` di GNOME, poi il nome del tema GTK per le
+sessioni che l'hanno lasciato a `default`, poi `GTK_THEME`; su macOS
+`AppleInterfaceStyle`. Se nessuno risponde si resta sul nero, che è ciò che
+l'icona era prima.
+
+`colors` accetta ora il valore `auto`, che è il nuovo default ed è offerto
+nelle preferenze; una scelta esplicita continua a vincere. Un timer da 10 s
+ridisegna l'icona se il tema cambia mentre l'applicazione gira — il costo
+della domanda è di 4 ms, misurati.
+
+**Nota per chi aggiorna:** un file di configurazione già esistente contiene
+`colors = black` e resta nero, perché non è distinguibile da una scelta
+deliberata. Va messo a `auto` a mano o dalle preferenze.
+
+La verifica GUI completa non è automatizzabile: la piattaforma Qt
+`offscreen` non crea una tray di sistema (`QObject::connect: No such signal
+QPlatformNativeInterface::systemTrayWindowChanged`). Sono coperti da test la
+rilevazione del tema, la risoluzione della variante e il ridisegno al cambio
+di tema.
+
 ### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
 
 **Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
@@ -911,6 +957,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #14 | Sonos pubblicizzato ma assente | `7b38c65d` |
 | #15 | `getch` non impacchettato: `--control` rotto una volta installato | `f160fb52` |
 | #16 | `pactl` irraggiungibile: traceback invece di un messaggio | `e124d828` |
+| #17 | Icona della tray nera su tema scuro | vedi sotto |
 
 ---
 
