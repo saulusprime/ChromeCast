@@ -817,7 +817,7 @@ usciva come traceback mentre lo stesso errore altrove era una riga; il tasto
 significa una fila di `AvailableDevice(...)`; e l'import di `typing` era
 avanzato da dichiarazioni spostate nel corpo della classe.
 
-### #16 — `pactl` presente ma irraggiungibile: traceback  ✅ `PENDING`
+### #16 — `pactl` presente ma irraggiungibile: traceback  ✅ `e124d828`
 
 **Sintomo.** `mkchromecast --reset` da un contesto senza sessione audio (login
 ssh, unità systemd) esce con
@@ -910,7 +910,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #13 | `-vf` doppio; sottotitoli mai funzionanti su non-mkv | `46bf7d75` |
 | #14 | Sonos pubblicizzato ma assente | `7b38c65d` |
 | #15 | `getch` non impacchettato: `--control` rotto una volta installato | `f160fb52` |
-| #16 | `pactl` irraggiungibile: traceback invece di un messaggio | vedi sotto |
+| #16 | `pactl` irraggiungibile: traceback invece di un messaggio | `e124d828` |
 
 ---
 
