@@ -1,3 +1,11 @@
+* Mkchromecast (0.4.2), 2026-08-22 — fork saulusprime/ChromeCast
+
+    - The volume control opens again. It raised `TypeError: setValue(self,
+      a0: int): argument 1 has unexpected type 'float'`, because `round(x, 1)`
+      returns a float even when the result is whole and Qt sliders take ints.
+      The line is old; it only became reachable once casting from the tray
+      worked, in 0.4.1.
+
 * Mkchromecast (0.4.1), 2026-08-22 — fork saulusprime/ChromeCast
 
     Two problems found by using the tray on the desktop, both documented in
