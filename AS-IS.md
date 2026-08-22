@@ -890,7 +890,7 @@ QPlatformNativeInterface::systemTrayWindowChanged`). Sono coperti da test la
 rilevazione del tema, la risoluzione della variante e il ridisegno al cambio
 di tema.
 
-### #18 — Nessuna icona nella griglia delle applicazioni  ✅ `PENDING`
+### #18 — Nessuna icona nella griglia delle applicazioni  ✅ `4b8c388a`
 
 **Sintomo.** In "Mostra applicazioni" di Ubuntu compare il nome
 *Mkchromecast* senza icona.
@@ -994,7 +994,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #15 | `getch` non impacchettato: `--control` rotto una volta installato | `f160fb52` |
 | #16 | `pactl` irraggiungibile: traceback invece di un messaggio | `e124d828` |
 | #17 | Icona della tray nera su tema scuro | `59a5b788` |
-| #18 | Nessuna icona nella griglia delle applicazioni | vedi sotto |
+| #18 | Nessuna icona nella griglia delle applicazioni | `4b8c388a` |
 
 ---
 
