@@ -64,6 +64,12 @@ def icon_path(icon_name: str) -> str:
     return os.path.join(_INSTALLED_IMAGES, filename)
 
 
+# Shown when a cast attempt failed without telling us why.  When we do know,
+# the reason travels with the pcastready signal and is shown instead: under a
+# .desktop launcher our stdout goes to the journal, where nobody looks.
+_DEFAULT_FAILURE = "Streaming Process Failed. Try Again..."
+
+
 def linux_notify(message: str) -> None:
     """Shows a desktop notification through libnotify, when it is available.
 
@@ -112,6 +118,8 @@ class menubar(QtWidgets.QMainWindow):
         self.stopped = False
         self.played = False
         self.pcastfailed = False
+        # Why the last attempt failed, for the notification to repeat.
+        self.pcastfailure = _DEFAULT_FAILURE
 
         self.available_devices: list[cast.AvailableDevice] = []
 
@@ -432,12 +440,15 @@ class menubar(QtWidgets.QMainWindow):
         print("pcastready ?", message)
         if message == "_play_cast_ success":
             self.pcastfailed = False
+            self.pcastfailure = _DEFAULT_FAILURE
             if os.path.exists("/tmp/mkchromecast.tmp") is True:
                 self.cast = self._player.cast
 
             self.set_icon_idle()
         else:
             self.pcastfailed = True
+            _, _, reason = message.partition("_play_cast_ failed: ")
+            self.pcastfailure = reason or _DEFAULT_FAILURE
             self.set_icon_nodev()
             self.stop_cast()
             # This should stop the play process when there is an error in the
@@ -505,7 +516,7 @@ class menubar(QtWidgets.QMainWindow):
                         "./notifier/terminal-notifier.app/Contents/MacOS/terminal-notifier",
                         "-group", "cast",
                         "-title", "Mkchromecast",
-                        "-message", "Streaming Process Failed. Try Again...",
+                        "-message", self.pcastfailure,
                     ]
                 else:
                     stop = [
@@ -520,7 +531,7 @@ class menubar(QtWidgets.QMainWindow):
 
             elif _mkcc.platform == "Linux" and self.config.notifications:
                 if self.pcastfailed is True:
-                    linux_notify("Streaming Process Failed. Try Again...")
+                    linux_notify(self.pcastfailure)
                 else:
                     linux_notify("Streaming Stopped!")
 

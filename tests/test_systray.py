@@ -130,5 +130,50 @@ class TrayIconColorTests(unittest.TestCase):
                         else icon_set).endswith(".png"))
 
 
+@unittest.skipUnless(HAS_QT, "PyQt5 is not installed")
+class FailureReasonTests(unittest.TestCase):
+    """Covers the tray repeating why an attempt failed.
+
+    "Try Again..." is bad advice when the answer is that another program holds
+    the port, and under a .desktop launcher the explanation we print goes to
+    the journal, where nobody looks.
+    """
+
+    def make_tray(self):
+        stub = mock.Mock(spec=systray.menubar)
+        stub.pcastfailure = systray._DEFAULT_FAILURE
+        # Reading back the device we cast to is not what these are about, and
+        # it depends on a file left in /tmp by any earlier run.
+        stub._player = mock.Mock(cast=None)
+        self.enterContext(mock.patch.object(systray.os.path, "exists",
+                                            autospec=True, return_value=False))
+        return stub
+
+    def testTheReasonIsKeptForTheNotification(self):
+        stub = self.make_tray()
+        reason = "Port 5000 is already in use by another program."
+
+        systray.menubar.pcastready(stub, f"_play_cast_ failed: {reason}")
+
+        self.assertEqual(stub.pcastfailure, reason)
+        self.assertTrue(stub.pcastfailed)
+
+    def testAFailureWithoutAReasonKeepsTheGenericMessage(self):
+        stub = self.make_tray()
+
+        systray.menubar.pcastready(stub, "_play_cast_ failed")
+
+        self.assertEqual(stub.pcastfailure, systray._DEFAULT_FAILURE)
+
+    def testSuccessForgetsThePreviousReason(self):
+        stub = self.make_tray()
+        stub.pcastfailure = "Port 5000 is already in use by another program."
+
+        systray.menubar.pcastready(stub, "_play_cast_ success")
+
+        self.assertEqual(stub.pcastfailure, systray._DEFAULT_FAILURE)
+        self.assertFalse(stub.pcastfailed)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
