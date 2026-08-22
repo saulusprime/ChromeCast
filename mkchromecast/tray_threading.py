@@ -17,6 +17,7 @@ from mkchromecast.cast import CastError
 from mkchromecast.constants import OpMode
 from mkchromecast.pulseaudio import (check_sink, create_sink,
                                      PulseAudioNotAvailable)
+from mkchromecast.stream_infra import StreamServerError
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 
 
@@ -62,28 +63,33 @@ class Player(QObject):
         config_ = config.Config(platform=_mkcc.platform,
                                 read_only=True,
                                 debug=_mkcc.debug)
-        with config_:
-            if config_.backend == "node":
-                node.stream_audio()
-            else:
-                # Preferences are read from disk while building the settings,
-                # so drop the cached ones to pick up any change.  This used to
-                # be a reload() of the audio module, which only worked because
-                # that module did its work on import.
-                mkchromecast.audio.reload_settings()
-                if not mkchromecast.audio.main():
-                    self.pcastready.emit("_play_cast_ failed")
-                    self.pcastfinished.emit()
-                    return
+        try:
+            with config_:
+                if config_.backend == "node":
+                    node.stream_audio()
+                else:
+                    # Preferences are read from disk while building the
+                    # settings, so drop the cached ones to pick up any change.
+                    # This used to be a reload() of the audio module, which
+                    # only worked because that module did its work on import.
+                    mkchromecast.audio.reload_settings()
+                    if not mkchromecast.audio.main():
+                        self._fail("The streaming server failed to start.")
+                        return
+        except StreamServerError as e:
+            # A busy port used to reach us as SystemExit, and PyQt turns any
+            # exception escaping a slot into an abort: the whole tray died
+            # about a second after the user picked a device.
+            self._fail(str(e))
+            return
+
         if _mkcc.platform == "Linux" and _mkcc.adevice is None:
             # We create the sink only if it is not available
             try:
                 if not check_sink():
                     create_sink()
             except PulseAudioNotAvailable as e:
-                print(colors.error(str(e)))
-                self.pcastready.emit("_play_cast_ failed")
-                self.pcastfinished.emit()
+                self._fail(str(e))
                 return
 
         start = cast.Casting(_mkcc)
@@ -104,6 +110,17 @@ class Player(QObject):
             if _mkcc.debug is True:
                 print(colors.warning(f":::Threading::: play_cast failed: {e}"))
             self.pcastready.emit("_play_cast_ failed")
+        self.pcastfinished.emit()
+
+    def _fail(self, reason: str) -> None:
+        """Reports a failed attempt, without taking the tray down with it.
+
+        The reason travels with the signal so that the tray can show it: under
+        a .desktop launcher nobody reads our stdout, and "Try Again..." is bad
+        advice when the answer is that some other program holds the port.
+        """
+        print(colors.error(reason))
+        self.pcastready.emit(f"_play_cast_ failed: {reason}")
         self.pcastfinished.emit()
 
 

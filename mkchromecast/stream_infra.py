@@ -23,6 +23,10 @@ from mkchromecast import colors
 FlaskViewReturn = Union[str, flask.Response]
 
 
+class StreamServerError(RuntimeError):
+    """Raised when the local streaming server cannot be started."""
+
+
 @dataclass
 class BackendInfo:
     name: Optional[str] = None
@@ -244,15 +248,26 @@ class PipelineProcess:
         Without this check, a failed bind would only be reported on the child
         process' stdout, and we would go on to point the cast device at a port
         served by some unrelated program.
+
+        Raises:
+            StreamServerError: if the port is already taken.  This used to be
+                a SystemExit, which the CLI handled but which killed the whole
+                tray application: it was raised inside a Qt worker slot, and
+                PyQt aborts the process on any exception that escapes one.
         """
         if not port_is_free(self._host, self._port):
-            print(colors.error(
-                f"Port {self._port} is already in use by another program."))
-            print(colors.options("Hint:")
-                  + f" retry with --port {self._port + 1}, or free that port. "
-                  "On Ubuntu it is often taken by shairport-sync; check with "
-                  "`systemctl status shairport-sync`.")
-            raise SystemExit(1)
+            message = (
+                f"Port {self._port} is already in use by another program. "
+                f"Retry with --port {self._port + 1}, change Streaming Port "
+                "in the tray preferences, or free that port.")
+
+            if self._port == 5000:
+                # Where the default used to be, and the reason it moved.
+                message += (" On Ubuntu 5000 is often taken by "
+                            "shairport-sync; check with `systemctl status "
+                            "shairport-sync`.")
+
+            raise StreamServerError(message)
 
         self._proc.start()
 
