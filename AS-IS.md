@@ -10,7 +10,7 @@ Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 che il codice stesso dichiarava rotti (#11, #12, #13), le promesse su Sonos
 che il codice non manteneva (#14), i due difetti emersi impacchettando
 (#15, #16) e i cinque segnalati usando l'applicazione sul desktop
-(#17, #18, #19, #20, #21, #22). Suite di test da 33 a **110** casi.
+(#17, #18, #19, #20, #21, #22, #23). Suite di test da 33 a **114** casi.
 
 ## Ambiente di prova
 
@@ -1069,6 +1069,56 @@ compare su `pychromecast.Chromecast` ma viene legato sull'istanza in
 `__init__` (`self.set_volume = receiver_controller.set_volume`), quindi sia
 `value_changed()` sia `Casting.volume_up()`/`volume_down()` funzionano.
 
+### #23 — Uscire non usciva, e faceva partire una ricerca  ✅ `c667a206`
+
+**Sintomo.** Cliccando *Quit* l'applicazione non si chiude e si mette a
+cercare i dispositivi. Nel journal:
+
+```
+File "/usr/lib/python3/dist-packages/mkchromecast/systray.py", line 738, in exit_all
+    self.stop_cast()
+File "/usr/lib/python3/dist-packages/mkchromecast/systray.py", line 523, in stop_cast
+    self.read_config()
+AttributeError: 'menubar' object has no attribute 'read_config'
+```
+
+**Causa.** Un residuo del refactor della configurazione. `read_config()`
+rileggeva il file per aggiornare `self.notifications`, `self.searchatlaunch` e
+`self.colors`; il commit `377815b7` ha sostituito quegli attributi con
+`self.config.*` e **ha cancellato il metodo lasciando in piedi la sua unica
+chiamata**, dentro `stop_cast()`.
+
+I due sintomi vengono entrambi da lì. `stop_cast()` chiama `search_cast()`
+poche righe prima — ecco la ricerca — e poi muore sull'`AttributeError`,
+quindi non torna mai al chiamante: `exit_all()` non arriva a
+`self.app.quit()` e l'applicazione resta aperta.
+
+**Perché salta fuori solo adesso.** Come #22, il corpo di `stop_cast()` gira
+solo se `self.cast` non è `None`, oppure dopo uno stop o un fallimento. Prima
+di #19 e #21, da questa macchina non si arrivava a castare e il tentativo
+fallito uccideva l'applicazione prima.
+
+**Fix.** La rilettura torna, nella forma attuale: `self.config.load_and_validate()`.
+La `Config` della tray è in sola lettura, quindi rilegge senza riscrivere.
+
+Uscendo non si cerca più: `exit_all()` alza `self.exiting`, e `stop_cast()`
+salta il `search_cast()`. Fermare dal menù continua a rinfrescare l'elenco.
+Il flag è un attributo e non un parametro di `stop_cast()` di proposito: il
+metodo è collegato a `StopCastAction.triggered`, che passa il proprio
+`checked` a qualunque slot accetti un argomento, e avrebbe disattivato in
+silenzio la ricerca anche quando serve.
+
+**Verifica.** Quattro test in `tests/test_systray.py` sul metodo vero:
+rilegge la configurazione, cerca fermando dal menù, non cerca uscendo, e
+`exit_all()` arriva a `app.quit()`.
+
+Cercati anche gli altri residui dello stesso tipo, percorrendo l'AST di
+`systray.py`, `preferences.py`, `tray_threading.py` e `cast.py` per ogni
+`self.x()` che non sia né un metodo né un attributo assegnato. L'unico
+rimasto è `_get_chromecast()` dentro `_DisabledSonosCasting`
+([`cast.py:692`](mkchromecast/cast.py#L692)), cioè nel codice Sonos già
+disabilitato e in backlog.
+
 ### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
 
 **Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
@@ -1142,6 +1192,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #20 | La notifica non diceva perché il cast era fallito | `494f1c7e` |
 | #21 | Porta non configurabile dalla tray; default a 5001 | `1332d261` |
 | #22 | `TypeError` aprendo il cursore del volume | `b99716c8` |
+| #23 | Quit non usciva e faceva partire una ricerca | `c667a206` |
 
 ---
 
@@ -1172,7 +1223,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 > la forma con percorsi assoluti funziona da qualunque directory.
 
 ```bash
-# 1. i test devono restare verdi (33 prima dei fix, 110 dopo)
+# 1. i test devono restare verdi (33 prima dei fix, 114 dopo)
 python -m unittest discover -s tests -v
 
 # 2. discovery: output visibile anche in pipe, exit code 0
