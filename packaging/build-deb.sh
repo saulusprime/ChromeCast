@@ -48,11 +48,10 @@ mkdir -p "$PKGDIR/DEBIAN" \
          "$PKGDIR/usr/share/mkchromecast/nodejs" \
          "$PKGDIR/usr/share/doc/mkchromecast"
 
-# The Python package, without the caches of whoever built it.  getch/ is left
-# out: nothing imports it, and setup.py does not ship it either.
+# The Python package, without the caches of whoever built it.  getch/ is part
+# of it: bin/mkchromecast imports it for --control.
 cp -r "$REPO/mkchromecast" "$PKGDIR/usr/lib/python3/dist-packages/"
 PKGSRC="$PKGDIR/usr/lib/python3/dist-packages/mkchromecast"
-rm -rf "$PKGSRC/getch"
 find "$PKGSRC" -name '__pycache__' -type d -prune -exec rm -rf {} +
 find "$PKGSRC" -name '*.pyc' -delete
 

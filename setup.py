@@ -120,7 +120,10 @@ elif platform.system() == "Linux":
         author="Muammar El Khatib",
         author_email="http://muammar.me/",
         keywords=["chromecast"],
-        packages=["mkchromecast"],
+        # getch is imported by bin/mkchromecast for --control, so the
+        # subpackage has to ship too: leaving it out made `--control` fail
+        # with ModuleNotFoundError on every installed copy.
+        packages=["mkchromecast", "mkchromecast.getch"],
         scripts=["bin/mkchromecast"],
         classifiers=LINUX_CLASSIFIERS,
         data_files=LINUX_DATA,

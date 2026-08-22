@@ -6,7 +6,6 @@ import os
 import psutil
 import signal
 import sys
-from typing import List, Optional
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 if os.path.exists(os.path.join(HERE, '..', 'mkchromecast')):
@@ -224,7 +223,8 @@ class CastProcess(object):
                             if self.mkcc.debug is True:
                                 self.print_controls_msg()
                     elif (key == 'a'):
-                        print(self.cc.available_devices)
+                        cast.print_available_devices(
+                            self.cc.available_devices)
                         self.get_devices(self.mkcc.select_device,
                                          write_to_pickle=False)
                         self.cc.play_cast()
@@ -306,9 +306,9 @@ class CastProcess(object):
 
 if __name__ == "__main__":
     mkcc = mkchromecast.Mkchromecast()
-    maybe_execute_single_action(mkcc)
 
     try:
+        maybe_execute_single_action(mkcc)
         CastProcess(mkcc).run()
     except (cast.CastError, PulseAudioNotAvailable) as e:
         print(colors.error(str(e)))
