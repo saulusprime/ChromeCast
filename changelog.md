@@ -1,3 +1,12 @@
+* Mkchromecast (0.4.3), 2026-08-22 — fork saulusprime/ChromeCast
+
+    - Quit quits again. It raised AttributeError halfway through tearing the
+      cast down, on a method the config refactor had deleted while leaving its
+      only caller behind, so the application stayed open.  Stopping a cast
+      went through the same line.
+    - Quitting no longer starts a device search.  Stopping refreshes the list,
+      which made sense from the menu and not on the way out.
+
 * Mkchromecast (0.4.2), 2026-08-22 — fork saulusprime/ChromeCast
 
     - The volume control opens again. It raised `TypeError: setValue(self,
