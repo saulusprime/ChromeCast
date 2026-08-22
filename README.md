@@ -369,7 +369,7 @@ the only build that can replace the distribution's own
 
 ```
 make deb
-sudo apt install ./dist/mkchromecast_0.4.0-1local1_all.deb
+sudo apt install ./dist/mkchromecast_*_all.deb
 ```
 
 Example: mkchromecast -n Seminterrato -p 5001

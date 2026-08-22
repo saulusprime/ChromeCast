@@ -8,8 +8,9 @@ Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 
 **Stato:** tutti i problemi individuati sono chiusi, e con loro i tre percorsi
 che il codice stesso dichiarava rotti (#11, #12, #13), le promesse su Sonos
-che il codice non manteneva (#14) e due difetti emersi impacchettando
-(#15, #16). Suite di test da 33 a **87** casi.
+che il codice non manteneva (#14), i due difetti emersi impacchettando
+(#15, #16) e i due segnalati usando l'applicazione sul desktop
+(#17, #18). Suite di test da 33 a **87** casi.
 
 ## Ambiente di prova
 
@@ -1004,8 +1005,9 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 > `/usr/bin/mkchromecast`, che appartiene a un pacchetto e **non** all'albero
 > di lavoro. Su questa macchina era il pacchetto apt `0.3.9~git20200902+db2964a`
 > del 2020, che non conteneva niente di quanto è documentato qui; dal 21 agosto
-> 2026 è stato sostituito dal pacchetto costruito con `make deb`
-> (`0.3.9-1local1`). Da controllare prima di fidarsi:
+> 2026 è sostituito dai pacchetti costruiti con `make deb`, che portano una
+> revisione `Nlocal1`. Quale sia quello installato in un dato momento va
+> controllato, non dato per scontato:
 >
 > ```bash
 > dpkg -l mkchromecast                                   # quale versione
@@ -1024,7 +1026,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 > la forma con percorsi assoluti funziona da qualunque directory.
 
 ```bash
-# 1. i test devono restare verdi (33 prima dei fix, 66 dopo)
+# 1. i test devono restare verdi (33 prima dei fix, 87 dopo)
 python -m unittest discover -s tests -v
 
 # 2. discovery: output visibile anche in pipe, exit code 0
