@@ -6,9 +6,9 @@ Build-Depends: debhelper-compat (= 13),
                python3-all,
                python3-setuptools
 Standards-Version: 4.7.0
-Homepage: https://github.com/saulusprime/ChromeCast
-Vcs-Git: https://github.com/saulusprime/ChromeCast.git
-Vcs-Browser: https://github.com/saulusprime/ChromeCast
+Homepage: https://github.com/saulusprime/MKChromeCast
+Vcs-Git: https://github.com/saulusprime/MKChromeCast.git
+Vcs-Browser: https://github.com/saulusprime/MKChromeCast
 
 Package: mkchromecast
 Architecture: all

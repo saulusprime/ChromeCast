@@ -1,4 +1,4 @@
-* Mkchromecast (0.4.4), 2026-08-22 — fork saulusprime/ChromeCast
+* Mkchromecast (0.4.4), 2026-08-22 — fork saulusprime/MKChromeCast
 
     Packaging, so that the .deb can be handed to somebody else.
 
@@ -17,7 +17,7 @@
       says "Copyright 2006 Rogue Amoeba Software, LLC. All rights reserved."
       -- not at all.
 
-* Mkchromecast (0.4.3), 2026-08-22 — fork saulusprime/ChromeCast
+* Mkchromecast (0.4.3), 2026-08-22 — fork saulusprime/MKChromeCast
 
     - Quit quits again. It raised AttributeError halfway through tearing the
       cast down, on a method the config refactor had deleted while leaving its
@@ -26,7 +26,7 @@
     - Quitting no longer starts a device search.  Stopping refreshes the list,
       which made sense from the menu and not on the way out.
 
-* Mkchromecast (0.4.2), 2026-08-22 — fork saulusprime/ChromeCast
+* Mkchromecast (0.4.2), 2026-08-22 — fork saulusprime/MKChromeCast
 
     - The volume control opens again. It raised `TypeError: setValue(self,
       a0: int): argument 1 has unexpected type 'float'`, because `round(x, 1)`
@@ -34,7 +34,7 @@
       The line is old; it only became reachable once casting from the tray
       worked, in 0.4.1.
 
-* Mkchromecast (0.4.1), 2026-08-22 — fork saulusprime/ChromeCast
+* Mkchromecast (0.4.1), 2026-08-22 — fork saulusprime/MKChromeCast
 
     Two problems found by using the tray on the desktop, both documented in
     `AS-IS.md` with symptom, cause, evidence collected and fix.
@@ -61,7 +61,7 @@
     - "Reset Settings" works. It called a method on an attribute that does not
       exist, so the button had never done anything but raise.
 
-* Mkchromecast (0.4.0), 2026-08-22 — fork saulusprime/ChromeCast
+* Mkchromecast (0.4.0), 2026-08-22 — fork saulusprime/MKChromeCast
 
     Fixes found by running the code on Ubuntu 26.04 with Python 3.14,
     PipeWire and pychromecast 14. Every entry is documented in `AS-IS.md`

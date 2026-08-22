@@ -119,7 +119,7 @@ elif platform.system() == "Linux":
         long_description=open(ROOT + "/README.md").read(),
         include_package_data=True,
         license="MIT",
-        url="https://github.com/saulusprime/ChromeCast",
+        url="https://github.com/saulusprime/MKChromeCast",
         author="Muammar El Khatib",
         # Was "http://muammar.me/": a URL where an address belongs, which
         # the Debian packaging carried into the Maintainer field.

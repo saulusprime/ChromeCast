@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: mkchromecast
 Upstream-Contact: Muammar El Khatib <muammar@debian.org>
-Source: https://github.com/saulusprime/ChromeCast
+Source: https://github.com/saulusprime/MKChromeCast
 Comment: This is the saulusprime fork of mkchromecast, whose upstream is
  https://github.com/muammar/mkchromecast
  .
