@@ -103,7 +103,8 @@ def main() -> bool:
                 for path in nodejs_dir:
                     if os.path.isdir(path):
                         path = path + "html5-video-streamer.js"
-                        webcast = [name, path, mkcc.input_file]
+                        webcast = [name, path, mkcc.input_file,
+                                   str(mkcc.port)]
                         break
 
         try:

@@ -48,6 +48,11 @@ def backend_options_for_platform(platform: str, video: bool = False):
 
 
 DEFAULT_BITRATE = 192
+# 5000 was the default until 0.4.1, and it is a bad neighbourhood: it is what
+# shairport-sync takes on Linux and what AirPlay Receiver takes on macOS, so
+# the first cast of the day tended to land on a port somebody else was
+# already serving.
+DEFAULT_PORT = 5001
 CODECS_WITH_BITRATE = ["aac", "mp3", "ogg", "opus"]
 # TODO(xsdg): Reverse how this is defined.
 ALL_CODECS = QUANTIZED_SAMPLE_RATE_CODECS

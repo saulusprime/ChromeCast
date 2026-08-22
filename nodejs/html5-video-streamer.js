@@ -6,6 +6,11 @@ var http = require('http'),
     fs = require('fs'),
     util = require('util');
 
+// The port was hardcoded to 5000, while cast.py builds the media URL from
+// mkcc.port: any --port other than 5000 pointed the device at a port nothing
+// was listening on.  Same defect that webcast.js had.
+var port = parseInt(process.argv[3], 10) || 5000;
+
 http.createServer(function (req, res) {
   var path = process.argv[2];
   var stat = fs.statSync(path);
@@ -37,5 +42,5 @@ http.createServer(function (req, res) {
         'video/mp4' });
     fs.createReadStream(path).pipe(res);
   }
-}).listen(5000, '0.0.0.0');
-console.log('Server running at http://0.0.0.0:5000/');
+}).listen(port, '0.0.0.0');
+console.log('Server running at http://0.0.0.0:' + port + '/');

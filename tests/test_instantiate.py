@@ -23,6 +23,7 @@ class BasicInstantiationTest(unittest.TestCase):
         mock_args.sample_rate = 44100
         mock_args.youtube = None
         mock_args.input_file = None
+        mock_args.port = None
         mkcc = mkchromecast.Mkchromecast(mock_args)
 
     def testMP3CodecNodeBackend(self):
@@ -39,6 +40,7 @@ class BasicInstantiationTest(unittest.TestCase):
         mock_args.sample_rate = 44100
         mock_args.youtube = None
         mock_args.input_file = None
+        mock_args.port = None
         mkcc = mkchromecast.Mkchromecast(mock_args)
 
     def testTrayModeInstantiation(self):
@@ -56,6 +58,7 @@ class BasicInstantiationTest(unittest.TestCase):
         mock_args.sample_rate = 44100
         mock_args.youtube = None
         mock_args.input_file = None
+        mock_args.port = None
 
         # Now, we set the args to trigger tray mode.
         mock_args.discover = False
@@ -75,6 +78,7 @@ class BasicInstantiationTest(unittest.TestCase):
         mock_config.colors = "colors"
         mock_config.search_at_launch = False
         mock_config.alsa_device = "alsa_device"
+        mock_config.port = 5555
 
         mkcc = mkchromecast.Mkchromecast(mock_args)
 
@@ -89,6 +93,7 @@ class BasicInstantiationTest(unittest.TestCase):
         self.assertEqual(mkcc.colors, "colors")
         self.assertEqual(mkcc.search_at_launch, False)
         self.assertEqual(mkcc.adevice, "alsa_device")
+        self.assertEqual(mkcc.port, 5555)
 
     def testTrayModeRejectsUnsupportedBackend(self):
         """A backend from the config file that this platform cannot use.
@@ -109,6 +114,7 @@ class BasicInstantiationTest(unittest.TestCase):
         mock_args.sample_rate = 44100
         mock_args.youtube = None
         mock_args.input_file = None
+        mock_args.port = None
         mock_args.discover = False
         mock_args.reset = False
         mock_args.screencast = False
@@ -124,12 +130,88 @@ class BasicInstantiationTest(unittest.TestCase):
         mock_config.colors = "black"
         mock_config.search_at_launch = False
         mock_config.alsa_device = None
+        mock_config.port = constants.DEFAULT_PORT
 
         mkcc = mkchromecast.Mkchromecast(mock_args)
 
         supported = constants.backend_options_for_platform(
             mkcc.platform, mock_args.video)
         self.assertIn(mkcc.backend, supported)
+
+
+class PortTests(unittest.TestCase):
+    """Covers the one attribute every consumer of a port reads.
+
+    There are three sources for it: --port, the tray preferences, and the
+    default.  The tray has no command line to take it from, which is why the
+    preference exists at all.
+    """
+
+    def make_args(self, port, tray=False):
+        args = mock.Mock()
+        args.encoder_backend = None
+        args.bitrate = constants.DEFAULT_BITRATE
+        args.codec = "mp3"
+        args.command = None
+        args.resolution = None
+        args.chunk_size = 64
+        args.sample_rate = 44100
+        args.youtube = None
+        args.input_file = None
+        args.discover = False
+        args.reset = False
+        args.screencast = False
+        args.source_url = None
+        args.video = False
+        args.tray = tray
+        args.port = port
+        return args
+
+    def use_config_port(self, port):
+        mock_config = mock.create_autospec(config.Config, spec_set=True)
+        self.enterContext(
+            mock.patch.object(config, "Config", return_value=mock_config))
+        mock_config.backend = "ffmpeg"
+        mock_config.codec = "mp3"
+        mock_config.bitrate = constants.DEFAULT_BITRATE
+        mock_config.samplerate = 44100
+        mock_config.notifications = False
+        mock_config.colors = "auto"
+        mock_config.search_at_launch = False
+        mock_config.alsa_device = None
+        mock_config.port = port
+
+    def testWithoutAnythingElseThePortIsTheDefault(self):
+        mkcc = mkchromecast.Mkchromecast(self.make_args(port=None))
+
+        self.assertEqual(mkcc.port, constants.DEFAULT_PORT)
+
+    def testAnExplicitPortIsUsed(self):
+        mkcc = mkchromecast.Mkchromecast(self.make_args(port=5100))
+
+        self.assertEqual(mkcc.port, 5100)
+
+    def testTheTrayFollowsItsPreferences(self):
+        self.use_config_port(5100)
+
+        mkcc = mkchromecast.Mkchromecast(self.make_args(port=None, tray=True))
+
+        self.assertEqual(mkcc.port, 5100)
+
+    def testAnExplicitPortBeatsThePreference(self):
+        """`mkchromecast -t -p 5002` has to keep meaning what it says."""
+        self.use_config_port(5100)
+
+        mkcc = mkchromecast.Mkchromecast(self.make_args(port=5002, tray=True))
+
+        self.assertEqual(mkcc.port, 5002)
+
+    def testAPortOutsideTheRangeFallsBack(self):
+        for port in (0, -1, 65536, 99999):
+            with self.subTest(port=port):
+                mkcc = mkchromecast.Mkchromecast(self.make_args(port=port))
+
+                self.assertEqual(mkcc.port, constants.DEFAULT_PORT)
 
 
 class SharedInstanceTest(unittest.TestCase):
@@ -160,6 +242,7 @@ class SharedInstanceTest(unittest.TestCase):
         args.version = False
         args.youtube = None
         args.video = False
+        args.port = None
         self.args = args
 
         self.enterContext(mock.patch.object(

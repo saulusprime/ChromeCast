@@ -50,6 +50,7 @@ if _mkcc.operation == OpMode.TRAY:
         QLineEdit,
     )
     from PyQt5 import QtCore
+    from PyQt5.QtGui import QIntValidator
 
     class preferences(QWidget):
         def __init__(self, scale_factor):
@@ -71,6 +72,7 @@ if _mkcc.operation == OpMode.TRAY:
             self.init_iconcolors()
             self.init_notifications()
             self.init_searchatlaunch()
+            self.init_port()
 
             self.qle_alsadevice: Optional[QLineEdit] = None
             if _mkcc.platform == "Linux":
@@ -197,14 +199,28 @@ if _mkcc.operation == OpMode.TRAY:
 
             self.qcatlaunch.activated[str].connect(self.onActivatedatlaunch)
 
+        def init_port(self):
+            """
+            Set the port the local streaming server listens on
+            """
+            self.port = QLabel("Streaming Port", self)
+            self.port.move(20 * self.scale_factor, 244 * self.scale_factor)
+            self.qle_port = QLineEdit(self)
+            self.qle_port.move(179 * self.scale_factor, 244 * self.scale_factor)
+            self.qle_port.setFixedWidth(84 * self.scale_factor)
+            self.qle_port.setValidator(QIntValidator(1, 65535, self))
+            self.qle_port.setText(str(self.config.port))
+
+            self.qle_port.textChanged[str].connect(self.onActivatedport)
+
         def init_alsadevice(self):
             """
             Set the ALSA Device
             """
             self.alsadevice = QLabel("ALSA Device", self)
-            self.alsadevice.move(20 * self.scale_factor, 244 * self.scale_factor)
+            self.alsadevice.move(20 * self.scale_factor, 274 * self.scale_factor)
             self.qle_alsadevice = QLineEdit(self)
-            self.qle_alsadevice.move(179 * self.scale_factor, 244 * self.scale_factor)
+            self.qle_alsadevice.move(179 * self.scale_factor, 274 * self.scale_factor)
             self.qle_alsadevice.setFixedWidth(84 * self.scale_factor)
 
             if self.config.alsa_device:
@@ -217,11 +233,11 @@ if _mkcc.operation == OpMode.TRAY:
             Buttons
             """
             resetbtn = QPushButton("Reset Settings", self)
-            resetbtn.move(10 * self.scale_factor, 274 * self.scale_factor)
+            resetbtn.move(10 * self.scale_factor, 304 * self.scale_factor)
             resetbtn.clicked.connect(self.reset_configuration)
 
             faqbtn = QPushButton("FAQ", self)
-            faqbtn.move(138 * self.scale_factor, 274 * self.scale_factor)
+            faqbtn.move(138 * self.scale_factor, 304 * self.scale_factor)
             faqbtn.clicked.connect(
                 lambda: webbrowser.open(
                     "https://github.com/muammar/mkchromecast/wiki/FAQ"
@@ -240,10 +256,10 @@ if _mkcc.operation == OpMode.TRAY:
             )
             if _mkcc.platform == "Darwin":
                 # This is to fix the size of the window
-                self.setFixedSize(310 * self.scale_factor, 320 * self.scale_factor)
+                self.setFixedSize(310 * self.scale_factor, 350 * self.scale_factor)
             else:
                 # This is to fix the size of the window
-                self.setFixedSize(282 * self.scale_factor, 320 * self.scale_factor)
+                self.setFixedSize(282 * self.scale_factor, 350 * self.scale_factor)
             self.setWindowFlags(
                 QtCore.Qt.WindowCloseButtonHint
                 | QtCore.Qt.WindowMinimizeButtonHint
@@ -252,7 +268,10 @@ if _mkcc.operation == OpMode.TRAY:
             self.setWindowTitle("Mkchromecast Preferences")
 
         def reset_configuration(self):
-            self.configurations.write_defaults()
+            # This used to call a method of this name on `self.configurations`,
+            # an attribute that does not exist, so the button had never done
+            # anything but raise.
+            self.config.write_defaults()
 
             # Select/set default item for each preference widget.
             self.jump_to_item_or_start(self.qcbackend, self.config.backend)
@@ -262,9 +281,10 @@ if _mkcc.operation == OpMode.TRAY:
                 self.qcsamplerate, str(self.config.samplerate))
             self.jump_to_item_or_start(self.qccolors, self.config.colors)
             self.jump_to_item_or_start(
-                self.qcnotifations, VISUAL_BOOL[self.config.notifications])
+                self.qcnotifications, VISUAL_BOOL[self.config.notifications])
             self.jump_to_item_or_start(
                 self.qcatlaunch, VISUAL_BOOL[self.config.search_at_launch])
+            self.qle_port.setText(str(self.config.port))
             if self.qle_alsadevice:
                 self.qle_alsadevice.clear()
                 if self.config.alsa_device:
@@ -349,6 +369,24 @@ if _mkcc.operation == OpMode.TRAY:
         def onActivatedatlaunch(self, setting):
             with self.config:
                 self.config.search_at_launch = setting == "enabled"
+
+        def onActivatedport(self, port):
+            """Saves the port, ignoring anything that is not one.
+
+            The field is validated as it is typed, so a half-written number
+            reaches us as an out-of-range value rather than as nonsense; there
+            is nothing useful to store until it is finished.
+            """
+            try:
+                value = int(port)
+            except ValueError:
+                return
+
+            if not 1 <= value <= 65535:
+                return
+
+            with self.config:
+                self.config.port = value
 
         def onActivatedalsadevice(self, alsa_device):
             with self.config:

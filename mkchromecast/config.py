@@ -5,7 +5,9 @@ import os
 import pathlib
 from typing import Optional
 
-# NOTE: Can't import mkchromecast because that would create a circular dependency.
+# NOTE: Can't import mkchromecast because that would create a circular
+# dependency.  constants is a leaf module, so it is safe.
+from mkchromecast import constants
 
 # Section name.
 SETTINGS = "settings"
@@ -19,6 +21,7 @@ NOTIFICATIONS = "notifications"
 COLORS = "colors"
 SEARCH_AT_LAUNCH = "search_at_launch"
 ALSA_DEVICE = "alsa_device"
+PORT = "port"
 
 
 # Several modules build a Config at import time, so without this the same
@@ -83,6 +86,7 @@ class Config:
             COLORS: "auto",
             SEARCH_AT_LAUNCH: False,
             ALSA_DEVICE: None,
+            PORT: constants.DEFAULT_PORT,
         }
 
         if self._platform == "Darwin":
@@ -218,3 +222,25 @@ class Config:
     @alsa_device.setter
     def alsa_device(self, value: Optional[str]) -> None:
         self._config.set(SETTINGS, ALSA_DEVICE, str(value))
+
+    @property
+    def port(self) -> int:
+        return self._config.getint(SETTINGS, PORT)
+
+    @port.setter
+    def port(self, value: int) -> None:
+        self._config.set(SETTINGS, PORT, str(value))
+
+    def write_defaults(self) -> None:
+        """Puts every setting back to its default value, and saves.
+
+        Used by the "Reset Settings" button, which called a method of this
+        name on an attribute that did not exist, so it had never worked.
+        """
+        if not self._config.has_section(SETTINGS):
+            self._config.add_section(SETTINGS)
+
+        for key, value in self._default_conf.items():
+            setattr(self, key, value)
+
+        self._maybe_write_config()

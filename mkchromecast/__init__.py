@@ -122,7 +122,25 @@ class Mkchromecast:
         self.subtitles: Optional[str] = args.subtitles
         self.hijack: bool = args.hijack
         self.device_name: Optional[str] = args.name
-        self.port: int = args.port  # TODO(xsdg): Validate range 0..65535.
+        # Every consumer of a port reads this one attribute, so this is the
+        # only place the three sources have to be reconciled.  An explicit
+        # --port wins even in tray mode, so that `mkchromecast -t -p 5002`
+        # still means what it says; otherwise the tray follows its preferences
+        # and everything else follows the default.
+        self.port: int
+        if args.port is not None:
+            self.port = args.port
+        elif tray_config:
+            self.port = tray_config.port
+        else:
+            self.port = constants.DEFAULT_PORT
+
+        if not 1 <= self.port <= 65535:
+            print(colors.warning(
+                f"Port {self.port} is out of range; using "
+                f"{constants.DEFAULT_PORT} instead."))
+            self.port = constants.DEFAULT_PORT
+
         self.fps: str = args.fps  # TODO(xsdg): Why is this typed as a str?
 
         self.mtype: Optional[str] = args.mtype

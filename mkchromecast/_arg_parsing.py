@@ -309,9 +309,10 @@ Parser.add_argument(
     "-p",
     "--port",
     type=int,
-    default="5000",
-    help="""
-    Set the listening port for local webserver.
+    default=None,
+    help=f"""
+    Set the listening port for local webserver.  Defaults to
+    {constants.DEFAULT_PORT}; in tray mode, to whatever the preferences hold.
 
     Example:
 
