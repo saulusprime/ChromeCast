@@ -130,6 +130,9 @@ class menubar(QtWidgets.QMainWindow):
         self.stopped = False
         self.played = False
         self.pcastfailed = False
+        # Set on the way out, so that stopping does not start a scan that
+        # nobody is going to see.
+        self.exiting = False
         # Why the last attempt failed, for the notification to repeat.
         self.pcastfailure = _DEFAULT_FAILURE
 
@@ -503,7 +506,11 @@ class menubar(QtWidgets.QMainWindow):
             except psutil.NoSuchProcess:
                 pass
             checkmktmp()
-            self.search_cast()
+            if not self.exiting:
+                # Stopping from the menu refreshes the device list.  Quitting
+                # used to do it too, which is the search that appeared to
+                # start when the user asked to leave.
+                self.search_cast()
 
             # This is to retry when stopping and
             # pychromecast.error.NotConnected raises.
@@ -520,7 +527,13 @@ class menubar(QtWidgets.QMainWindow):
                     break
 
             self.stopped = True
-            self.read_config()
+            # Preferences may have changed while the tray was running, and
+            # what follows asks whether to notify.  This was `read_config()`,
+            # a method the config refactor (377815b7) deleted while leaving
+            # its only caller behind, so stopping or quitting raised
+            # AttributeError here: the cast was never torn down and the
+            # application never reached app.quit().
+            self.config.load_and_validate()
 
             if _mkcc.platform == "Darwin" and self.config.notifications:
                 if self.pcastfailed is True:
@@ -730,6 +743,7 @@ class menubar(QtWidgets.QMainWindow):
             child.kill()
 
     def exit_all(self):
+        self.exiting = True
         del_tmp()
         if self.cast is None and self.stopped is False:
             self.app.quit()

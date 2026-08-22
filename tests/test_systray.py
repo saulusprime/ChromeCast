@@ -202,5 +202,67 @@ class SliderValueTests(unittest.TestCase):
         self.assertEqual(systray.slider_value(0.656, 100), 66)
 
 
+@unittest.skipUnless(HAS_QT, "PyQt5 is not installed")
+class StopAndExitTests(unittest.TestCase):
+    """Covers tearing a cast down, and leaving.
+
+    stop_cast() called read_config(), a method the config refactor deleted
+    while leaving this one caller behind.  Both the Stop entry and Quit went
+    through here, so both raised AttributeError halfway: the cast was never
+    torn down, and Quit never reached app.quit().
+    """
+
+    def setUp(self):
+        self.enterContext(mock.patch.object(systray, "checkmktmp",
+                                            autospec=True))
+        self.enterContext(mock.patch.object(systray, "del_tmp", autospec=True))
+        # Would put a real notification on the desktop of whoever runs this.
+        self.enterContext(mock.patch.object(systray, "linux_notify",
+                                            autospec=True))
+
+    def make_tray(self):
+        stub = mock.Mock(spec=systray.menubar)
+        stub.cast = mock.Mock()
+        stub.stopped = False
+        stub.pcastfailed = False
+        stub.exiting = False
+        stub.config = mock.Mock(notifications=False)
+        # Assigned in __init__, so it is not part of the class spec.
+        stub.app = mock.Mock()
+        return stub
+
+    def testStoppingRereadsTheConfig(self):
+        stub = self.make_tray()
+
+        systray.menubar.stop_cast(stub)
+
+        stub.config.load_and_validate.assert_called_once_with()
+
+    def testStoppingFromTheMenuLooksForDevicesAgain(self):
+        stub = self.make_tray()
+
+        systray.menubar.stop_cast(stub)
+
+        stub.search_cast.assert_called_once_with()
+
+    def testQuittingDoesNotStartASearch(self):
+        """The search the user saw start when they asked to leave."""
+        stub = self.make_tray()
+        stub.exiting = True
+
+        systray.menubar.stop_cast(stub)
+
+        stub.search_cast.assert_not_called()
+
+    def testQuittingReachesTheEnd(self):
+        stub = self.make_tray()
+        stub.stopped = True
+
+        systray.menubar.exit_all(stub)
+
+        stub.stop_cast.assert_called_once_with()
+        stub.app.quit.assert_called_once_with()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
