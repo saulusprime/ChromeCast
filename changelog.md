@@ -1,9 +1,16 @@
-* Fork saulusprime/ChromeCast — Ubuntu work, **unreleased**
+* Mkchromecast (0.4.0), 2026-08-22 — fork saulusprime/ChromeCast
 
     Fixes found by running the code on Ubuntu 26.04 with Python 3.14,
     PipeWire and pychromecast 14. Every entry is documented in `AS-IS.md`
     with symptom, cause, evidence collected and fix; `TO-DO.md` holds what
     is left.
+
+    The version moves to 0.4.0 rather than 0.3.9 because 0.3.9 was never
+    released and because behaviour changed in ways a user notices: exit
+    codes mean something, a bad device index asks again instead of raising,
+    `--sample-rate` is honoured by the default backend, and Sonos is
+    documented as unavailable. The 0.3.9 entries below are upstream work
+    that this release carries.
 
     - Flask failing to bind is detected instead of leaving the device
       reading from a port nothing serves.
