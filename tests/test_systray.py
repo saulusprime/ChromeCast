@@ -175,5 +175,32 @@ class FailureReasonTests(unittest.TestCase):
         self.assertFalse(stub.pcastfailed)
 
 
+@unittest.skipUnless(HAS_QT, "PyQt5 is not installed")
+class SliderValueTests(unittest.TestCase):
+    """Covers the value handed to the volume slider.
+
+    Qt sliders take ints.  `round(x, 1)` returns a float even when the result
+    is whole, so opening the volume control raised
+    `TypeError: setValue(self, a0: int): argument 1 has unexpected type
+    'float'` as soon as it ran against a real device.
+    """
+
+    def testTheValueIsAlwaysAnInt(self):
+        for level in (0.0, 0.01, 0.5, 0.65, 0.999, 1.0):
+            with self.subTest(level=level):
+                value = systray.slider_value(level, 100)
+
+                self.assertIsInstance(value, int)
+                self.assertNotIsInstance(value, float)
+
+    def testTheEndsOfTheRangeMap(self):
+        self.assertEqual(systray.slider_value(0.0, 100), 0)
+        self.assertEqual(systray.slider_value(1.0, 100), 100)
+
+    def testTheValueIsRoundedToTheNearest(self):
+        self.assertEqual(systray.slider_value(0.654, 100), 65)
+        self.assertEqual(systray.slider_value(0.656, 100), 66)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

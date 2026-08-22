@@ -70,6 +70,18 @@ def icon_path(icon_name: str) -> str:
 _DEFAULT_FAILURE = "Streaming Process Failed. Try Again..."
 
 
+def slider_value(volume_level: float, maximum: int) -> int:
+    """Turns a 0..1 volume level into a value a QSlider will accept.
+
+    Qt sliders take ints, and `round(x, 1)` returns a float even when the
+    result is whole, so this used to raise TypeError as soon as it ran with a
+    real device.  It went unnoticed for as long as it did because the branch
+    was only reached once `self.cast` was an actual Chromecast, which it had
+    not been since the module-level `global cast` was rebound (81bd771f).
+    """
+    return round(volume_level * maximum)
+
+
 def linux_notify(message: str) -> None:
     """Shows a desktop notification through libnotify, when it is available.
 
@@ -548,7 +560,8 @@ class menubar(QtWidgets.QMainWindow):
         try:
             self.maxvolset = 100
             self.sl.setMaximum(self.maxvolset)
-            self.sl.setValue(round((self.cast.status.volume_level * self.maxvolset), 1))
+            self.sl.setValue(
+                slider_value(self.cast.status.volume_level, self.maxvolset))
         except AttributeError:
             self.maxvolset = 100
             self.sl.setMaximum(self.maxvolset)
