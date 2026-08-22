@@ -9,8 +9,8 @@ Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 **Stato:** tutti i problemi individuati sono chiusi, e con loro i tre percorsi
 che il codice stesso dichiarava rotti (#11, #12, #13), le promesse su Sonos
 che il codice non manteneva (#14), i due difetti emersi impacchettando
-(#15, #16) e i due segnalati usando l'applicazione sul desktop
-(#17, #18). Suite di test da 33 a **87** casi.
+(#15, #16) e i cinque segnalati usando l'applicazione sul desktop
+(#17, #18, #19, #20, #21). Suite di test da 33 a **107** casi.
 
 ## Ambiente di prova
 
@@ -927,6 +927,108 @@ richiesta 256px -> .../hicolor/256x256/apps/mkchromecast.png
 verificano che l'icona nominata dall'entry esista, sia quadrata e sia
 installata dove il tema la cerca.
 
+### #19 — Scegliere un dispositivo chiudeva l'applicazione  ✅ `00fcb4c5`
+
+**Sintomo.** Dalla tray: si avvia la scansione, compaiono i due dispositivi,
+se ne sceglie uno e dopo circa un secondo l'applicazione sparisce. Nessuna
+finestra di errore; la spiegazione resta nel journal.
+
+**Causa.** Il controllo della porta introdotto con #1 alzava `SystemExit(1)`
+([`stream_infra.py`](mkchromecast/stream_infra.py), `PipelineProcess.start`).
+Per la CLI è corretto. Ma la tray ci arriva da uno slot Qt eseguito in un
+thread worker, e **PyQt aborta il processo su qualunque eccezione che sfugge
+da uno slot**: `SystemExit` è una `BaseException`, quindi non veniva
+intercettata da nessuno dei gestori lungo il percorso.
+
+**Prova.** Dal syslog dell'utente, con `shairport-sync` sulla 5000:
+
+```
+mkchromecast.desktop[6810]: Port 5000 is already in use by another program.
+mkchromecast.desktop[6810]: Hint: retry with --port 5001, ...
+mkchromecast.desktop[6810]: QObject::~QObject: Timers cannot be stopped from another thread
+systemd[3232]: app-gnome-mkchromecast-6810.scope: Consumed 1.455s CPU time over 19.952s
+```
+
+Il meccanismo, isolato: uno slot che alza `SystemExit` in un `QThread` uccide
+l'applicazione e produce la stessa riga `QObject::~QObject`, senza mai
+arrivare al timer che avrebbe stampato "ancora viva".
+
+**Fix.** Nuova `StreamServerError(RuntimeError)`, sullo stesso modello di
+`PulseAudioNotAvailable` (#16): la CLI la aggiunge al gestore che già aveva e
+esce 1 come prima; la tray la intercetta in `_play_cast_` e segna il
+tentativo come fallito restando in piedi. I tre percorsi di errore della
+tray, che ripetevano le stesse tre righe, passano da un unico `_fail()`.
+
+Verificato sul percorso vero — `QThread` reale, `Player` reale, porta 5000
+davvero occupata:
+
+```console
+SEGNALE RICEVUTO: _play_cast_ failed: Port 5000 is already in use by another
+                  program. Retry with --port 5001, ...
+APPLICAZIONE ANCORA VIVA
+```
+
+CLI invariata: stesso messaggio, `exit=1`, nessun sink residuo.
+
+### #20 — Il motivo del fallimento non arrivava all'utente  ✅ `494f1c7e`
+
+**Sintomo.** La notifica diceva `Streaming Process Failed. Try Again...`.
+Riprovare non poteva funzionare: la porta sarebbe rimasta occupata.
+
+**Causa.** [`systray.py`](mkchromecast/systray.py) distingueva solo successo
+da fallimento; il motivo veniva stampato su stdout, che sotto un lanciatore
+`.desktop` finisce nel journal.
+
+**Fix.** Il motivo viaggia col segnale `pcastready` e finisce nella notifica.
+Quando non se ne conosce uno resta il messaggio generico di prima.
+
+### #21 — La porta non era raggiungibile dalla tray  ✅ `1332d261`
+
+**Sintomo.** Corretto #19, la tray sopravvive ma su questa macchina non casta
+comunque: la 5000 è occupata e dalla griglia delle applicazioni non c'è modo
+di cambiarla.
+
+**Causa.** La porta esisteva solo come argomento della riga di comando
+(`args.port`), e la tray non ne ha una:
+[`mkchromecast.desktop`](mkchromecast.desktop) lancia `mkchromecast -t` e
+basta. Fra le preferenze non c'era una voce per la porta.
+
+**Fix.** `port` diventa una chiave di configurazione come le altre
+([`config.py`](mkchromecast/config.py)), con una voce **Streaming Port** nel
+pannello delle preferenze, validata mentre si digita. Le tre sorgenti si
+riconciliano in un punto solo, [`__init__.py`](mkchromecast/__init__.py),
+perché da lì legge tutto il resto dell'applicazione:
+
+| situazione | porta usata |
+|---|---|
+| `mkchromecast -n X` | 5001 (default) |
+| `mkchromecast -n X -p 5100` | 5100 |
+| `mkchromecast -t`, preferenze a 5055 | 5055 |
+| `mkchromecast -t -p 5099`, preferenze a 5055 | 5099 |
+| `-p 99999` | 5001, con avviso |
+
+Un `--port` esplicito vince anche in modalità tray, altrimenti `-t -p 5001`
+avrebbe smesso di funzionare proprio per chi lo stava usando come rimedio.
+
+**Il default passa da 5000 a 5001.** La 5000 è occupata da `shairport-sync`
+su Linux e da AirPlay Receiver su macOS abbastanza spesso da essere un
+inciampo prevedibile, ed è anche il default del server di sviluppo di Flask.
+
+Due difetti emersi mentre si lavorava qui, corretti insieme:
+
+- **`html5-video-streamer.js` ignorava `--port`**: ascoltava su 5000 fisso
+  mentre `cast.py` costruiva l'URL da `mkcc.port`, quindi il dispositivo
+  chiedeva una porta su cui non c'era nessuno. È lo stesso difetto che
+  `webcast.js` aveva e che era già stato corretto in `c0072fa6`. Verificato:
+  `node html5-video-streamer.js film.mp4 5123` risponde `200` sulla 5123.
+- **Il tasto "Reset Settings" non aveva mai funzionato**:
+  [`preferences.py`](mkchromecast/preferences.py) chiamava
+  `self.configurations.write_defaults()`, dove `self.configurations` non
+  esiste (l'attributo è `self.config`) e `write_defaults` non esisteva su
+  `Config`; la riga successiva usava `self.qcnotifations`, con un refuso.
+  Il metodo alzava `AttributeError` alla prima riga. Ora `Config` ha un
+  `write_defaults()` e il pulsante riporta tutto ai default, porta compresa.
+
 ### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
 
 **Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
@@ -996,6 +1098,9 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #16 | `pactl` irraggiungibile: traceback invece di un messaggio | `e124d828` |
 | #17 | Icona della tray nera su tema scuro | `59a5b788` |
 | #18 | Nessuna icona nella griglia delle applicazioni | `4b8c388a` |
+| #19 | La tray moriva quando la porta era occupata | `00fcb4c5` |
+| #20 | La notifica non diceva perché il cast era fallito | `494f1c7e` |
+| #21 | Porta non configurabile dalla tray; default a 5001 | `1332d261` |
 
 ---
 
@@ -1026,7 +1131,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 > la forma con percorsi assoluti funziona da qualunque directory.
 
 ```bash
-# 1. i test devono restare verdi (33 prima dei fix, 87 dopo)
+# 1. i test devono restare verdi (33 prima dei fix, 107 dopo)
 python -m unittest discover -s tests -v
 
 # 2. discovery: output visibile anche in pipe, exit code 0
@@ -1048,6 +1153,11 @@ $MKC -s --discover                           # digita 99, poi un indice valido
 
 # 7. sottotitoli su file non-mkv, con e senza --resolution
 $MKC --video -i film.mp4 --subtitles sub.srt --resolution 720p
+
+# 8. la porta: default, argomento esplicito, preferenza della tray
+$MKC -n <device>                             # deve dire 5001
+$MKC -t                                      # Preferences -> Streaming Port
+$MKC -t -p 5099                              # l'esplicito vince sulla preferenza
 ```
 
 ### Prova completa: cast audio reale

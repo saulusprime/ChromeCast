@@ -602,6 +602,13 @@ runs, so switching the desktop theme changes the icon within a few seconds.
 To pin the icon to one variant, set **Icon Colors** in Preferences to
 `black`, `blue` or `white` rather than `auto`.
 
+The tray has no command line to take settings from, so what it streams with
+comes from Preferences: backend, codec, bitrate, sample rate, and **Streaming
+Port**. The port matters when something else on the machine already holds the
+one Mkchromecast wants -- the tray then says so and stays up, and the port is
+changed there rather than by editing the `.desktop` file. Launching the tray
+with an explicit `--port` still wins over the preference for that run.
+
 The system tray application can perform all the actions from the aforementioned
 commands. To get an idea, please check the [Youtube video
 here](https://github.com/muammar/mkchromecast#macos).
@@ -768,10 +775,12 @@ Known issues
 * When using `parec` and `lame` encoder, the delay between audio played and
   listened can be up to 8 seconds. I suggest you to use something different
   than mp3.
-* The streaming server listens on port 5000 by default, which other software
-  may already hold -- `shairport-sync` is a common one. Mkchromecast now says
-  so and stops, rather than pointing the device at a port it does not serve:
-  pick another one with `--port`.
+* The streaming server listens on port 5001 by default. It was 5000 until
+  0.4.1, which other software already holds often enough to be a nuisance:
+  `shairport-sync` on Linux, AirPlay Receiver on macOS. Whichever port is in
+  use, Mkchromecast says so and stops rather than pointing the device at a
+  port it does not serve; pick another one with `--port`, or with **Streaming
+  Port** in Preferences when running from the tray.
 * Subtitles are burned in only for input files that are not mkv; for mkv,
   Mkchromecast says so and casts without them.
 

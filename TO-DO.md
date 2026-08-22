@@ -4,17 +4,22 @@
 percorsi che il codice stesso dichiarava rotti. Il registro completo, con
 sintomo, causa, prova raccolta e fix per ognuno, è in [AS-IS.md](AS-IS.md).
 
-Suite di test: **87 casi**, tutti verdi (erano 33 all'inizio, 46 dopo
-l'analisi Ubuntu).
+Suite di test: **107 casi**, tutti verdi (erano 33 all'inizio, 46 dopo
+l'analisi Ubuntu, 87 dopo i difetti trovati usando l'applicazione).
+
+Quel che resta è un backlog vero: una funzione da riportare in vita, un
+packaging da rendere canonico e qualche riga di testo rimasta indietro
+rispetto al codice.
 
 ---
 
 ## Ripristinare il supporto Sonos
 
-È l'unica voce di backlog rimasta. Il codice che pilotava gli speaker Sonos è
+È la voce di backlog principale. Il codice che pilotava gli speaker Sonos è
 irraggiungibile da un refactor in poi:
-[`cast.py`](mkchromecast/cast.py) contiene `_DisabledSonosCasting`, che nessuno
-istanzia e il cui `play_cast()` alza prima di arrivare allo speaker.
+[`cast.py:522`](mkchromecast/cast.py#L522) contiene `_DisabledSonosCasting`,
+che nessuno istanzia e il cui `play_cast()` alza prima di arrivare allo
+speaker.
 
 La documentazione ora lo dice apertamente (commit `7b38c65d`) invece di
 promettere una funzione assente, quindi **non c'è più niente di ingannevole**:
@@ -25,15 +30,20 @@ Cosa servirebbe:
 1. Istanziare la classe quando `soco` trova degli speaker, e unire la sua
    `cclist` a quella dei Chromecast (oggi le due `initialize_cast()` sono
    copie divergenti).
-2. Togliere il `raise` da `play_cast()` e verificare `play_uri()` contro
-   l'API attuale di `soco`.
+2. Togliere il `raise` da [`play_cast()`](mkchromecast/cast.py#L757) e
+   verificare `play_uri()` contro l'API attuale di `soco`.
 3. Collegare i controlli della tray, che per i Sonos hanno percorsi separati
    ([`systray.py:431`](mkchromecast/systray.py#L431),
    [`:452`](mkchromecast/systray.py#L452),
    [`:530`](mkchromecast/systray.py#L530)).
 4. Unificare le due `input_device()`: quella di `Casting` è stata sistemata
    (`ee33dc84`), quella dentro `_DisabledSonosCasting` è ancora la copia
-   vecchia col `raise`.
+   vecchia col [`raise`](mkchromecast/cast.py#L679).
+5. Decidere che fare di `soco`, che oggi è una dipendenza dichiarata in
+   [`requirements.txt`](requirements.txt) e in
+   [`setup.py:60`](setup.py#L60) ma è importata solo da codice
+   irraggiungibile: o torna in servizio con i punti sopra, o va resa
+   opzionale come `PyGObject`.
 
 **Serve hardware.** Nessuna di queste modifiche è verificabile senza uno
 speaker Sonos in rete; senza prova sul campo si otterrebbe solo codice non
@@ -45,12 +55,34 @@ testato al posto di codice disabilitato.
 
 `make deb` costruisce un pacchetto valido con `dpkg-deb`
 ([`packaging/build-deb.sh`](packaging/build-deb.sh)), verificato e installato
-su questa macchina. Non è però packaging Debian *canonico*: manca la directory
-`debian/` (`control`, `rules`, `changelog`, `copyright`, `source/format`) che
-servirebbe per `dpkg-buildpackage` e per proporre il pacchetto a valle.
+su questa macchina (`0.4.0-3local1`). Non è però packaging Debian *canonico*:
+manca la directory `debian/` (`control`, `rules`, `changelog`, `copyright`,
+`source/format`) che servirebbe per `dpkg-buildpackage` e per proporre il
+pacchetto a valle.
 
 Richiede `debhelper` e `dh-python`, che qui non sono installati. È lavoro
 opzionale: serve solo se il pacchetto deve uscire da questa macchina.
+
+---
+
+## Testi rimasti indietro rispetto al codice
+
+Piccoli, ma sono affermazioni false che qualcuno leggerà.
+
+- **[`AS-IS.md`](AS-IS.md#L965), in fondo alla sezione sulle dipendenze di
+  sistema**, dice che il README «cita ancora `python3.6` e
+  `python3-pychromecast`». Metà è già risolta e metà non è più un difetto:
+  `python3.6` non compare più da nessuna parte, e
+  [`README.md:291`](README.md#L291) può tranquillamente raccomandare
+  `python3-pychromecast`, perché su Ubuntu 26.04 l'apt ne ha la **14.0.9**,
+  dentro il `pychromecast>=14,<15` di `requirements.txt`. La nota va tolta, e
+  con lei il link che punta ancora alla riga 286.
+- **[`_arg_parsing.py:566`](mkchromecast/_arg_parsing.py#L566)** manda l'utente
+  di `--help` su `http://rg3.github.io/yt-dlp/supportedsites.html`, che è
+  l'indirizzo del vecchio youtube-dl e non esiste. Il passaggio a `yt-dlp` è
+  fatto ovunque tranne che in questa riga; l'indirizzo buono è quello che il
+  README già usa,
+  `https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md`.
 
 ---
 
@@ -61,9 +93,9 @@ quando le incontra:
 
 - **Sottotitoli con file mkv**: non supportati; il codice stampa
   `Subtitles with mkv are not supported yet.`
-  ([`pipeline_builder.py`](mkchromecast/pipeline_builder.py), `_input_file_subtitle`).
-  I sottotitoli su file **non**-mkv funzionano da `46bf7d75` — prima non
-  funzionavano affatto.
+  ([`pipeline_builder.py:356`](mkchromecast/pipeline_builder.py#L356),
+  `_input_file_subtitle`). I sottotitoli su file **non**-mkv funzionano da
+  `46bf7d75` — prima non funzionavano affatto.
 
 ---
 
@@ -72,7 +104,7 @@ quando le incontra:
 Per qualunque intervento futuro:
 
 ```bash
-# la suite deve restare verde (baseline attuale: 87/87)
+# la suite deve restare verde (baseline attuale: 107/107)
 python -m unittest discover -s tests -v
 ```
 
