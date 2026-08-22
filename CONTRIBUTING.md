@@ -19,7 +19,9 @@ make check          # or: python -m unittest discover -s tests -v
 ```
 
 `make` on its own lists the other targets, which build a wheel, a `.deb` or a
-standalone binary. Note that `mkchromecast` on your PATH may belong to a
+standalone binary. If you touch packaging, build the distributable package
+with `make dist` and check it with `make lint`; lintian is expected to report
+nothing, including with `--pedantic`, which is what `make lint` passes. Note that `mkchromecast` on your PATH may belong to a
 distribution package rather than to your checkout: run your changes with
 `.venv/bin/python bin/mkchromecast` unless you have packaged them.
 

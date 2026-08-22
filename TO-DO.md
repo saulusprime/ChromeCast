@@ -7,9 +7,9 @@ sintomo, causa, prova raccolta e fix per ognuno, è in [AS-IS.md](AS-IS.md).
 Suite di test: **114 casi**, tutti verdi (erano 33 all'inizio, 46 dopo
 l'analisi Ubuntu, 87 dopo i difetti trovati usando l'applicazione).
 
-Quel che resta è un backlog vero: una funzione da riportare in vita, un
-packaging da rendere canonico e qualche riga di testo rimasta indietro
-rispetto al codice.
+Quel che resta è un backlog vero: una funzione da riportare in vita e qualche
+riga di testo rimasta indietro rispetto al codice. Il packaging Debian
+canonico, che era la seconda voce, è stato fatto (`#24`).
 
 ---
 
@@ -48,20 +48,6 @@ Cosa servirebbe:
 **Serve hardware.** Nessuna di queste modifiche è verificabile senza uno
 speaker Sonos in rete; senza prova sul campo si otterrebbe solo codice non
 testato al posto di codice disabilitato.
-
----
-
-## Packaging Debian con debhelper
-
-`make deb` costruisce un pacchetto valido con `dpkg-deb`
-([`packaging/build-deb.sh`](packaging/build-deb.sh)), verificato e installato
-su questa macchina (`0.4.0-3local1`). Non è però packaging Debian *canonico*:
-manca la directory `debian/` (`control`, `rules`, `changelog`, `copyright`,
-`source/format`) che servirebbe per `dpkg-buildpackage` e per proporre il
-pacchetto a valle.
-
-Richiede `debhelper` e `dh-python`, che qui non sono installati. È lavoro
-opzionale: serve solo se il pacchetto deve uscire da questa macchina.
 
 ---
 

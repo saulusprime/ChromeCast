@@ -10,7 +10,8 @@ Ciò che resta aperto sta in [TO-DO.md](TO-DO.md).
 che il codice stesso dichiarava rotti (#11, #12, #13), le promesse su Sonos
 che il codice non manteneva (#14), i due difetti emersi impacchettando
 (#15, #16) e i cinque segnalati usando l'applicazione sul desktop
-(#17, #18, #19, #20, #21, #22, #23). Suite di test da 33 a **114** casi.
+(#17, #18, #19, #20, #21, #22, #23) e il packaging reso distribuibile
+(#24). Suite di test da 33 a **114** casi.
 
 ## Ambiente di prova
 
@@ -1119,6 +1120,74 @@ rimasto è `_get_chromecast()` dentro `_DisabledSonosCasting`
 ([`cast.py:692`](mkchromecast/cast.py#L692)), cioè nel codice Sonos già
 disabilitato e in backlog.
 
+### #24 — Il pacchetto non era in condizione di essere distribuito  ✅ `b46bb5da`
+
+**Sintomo.** `make deb` produceva un `.deb` valido e installabile, ma non
+consegnabile a nessun altro: nessun pacchetto sorgente da ricostruire, e un
+manutentore a cui non si può scrivere.
+
+**Causa.** Tre cose distinte.
+
+1. `Maintainer: Muammar El Khatib <http://muammar.me/>` — un URL dove va un
+   indirizzo, quindi non un campo `Maintainer` valido. Veniva da
+   [`setup.py`](setup.py), che aveva lo stesso errore in `author_email`. E
+   comunque il manutentore è chi costruisce e distribuisce il pacchetto, non
+   l'autore upstream.
+2. Nessuna directory `debian/`: il pacchetto si poteva costruire solo con
+   `packaging/build-deb.sh`, su questa macchina. Chi lo riceve non può
+   ricostruirlo, ispezionarlo né correggerlo.
+3. **`archive/` contiene codice di terzi senza licenza.** Il `LICENSE` del
+   progetto dice che i file in `archive` e `notifier` hanno licenze proprie,
+   ma dentro `archive/audiodevice-src.zip` c'è:
+
+   ```
+   //  Copyright 2006 Rogue Amoeba Software, LLC. All rights reserved.
+   ```
+
+   Nessuna concessione. E `notifier/LICENSE` non contiene un testo di
+   licenza: rimanda a un URL. Entrambe le directory sono solo-macOS e non
+   vengono installate, ma sarebbero finite in qualunque tarball sorgente.
+
+**Fix.** Una `debian/` canonica: `control`, `rules` (`dh` con `pybuild` e
+`dh-python`), `changelog`, `copyright` in formato DEP-5, `source/format`
+`3.0 (native)`, `source/options`, `docs`, `clean`. `setup.py` era già adatto
+a pybuild — pacchetti, script e `data_files` finiscono dove il pacchetto
+Debian li vuole — quindi `rules` è di quattro righe più due override.
+
+Il manutentore è `saulusprime <pierno.paolo@gmail.com>`, corretto anche in
+`setup.py`. Il `copyright` DEP-5 dà un paragrafo a `mkchromecast/getch`
+(py-getch, Joe Esposito) e uno a `nodejs/`. `archive/` e `notifier/` restano
+nel repo ma fuori dal pacchetto sorgente, con il motivo scritto in
+[`debian/source/options`](debian/source/options).
+
+Due dettagli che non erano scontati:
+
+- **Le esclusioni di `tar-ignore` sostituiscono quelle predefinite**, non si
+  aggiungono. Senza nominare `.git` esplicitamente, il tarball sorgente lo
+  includeva: **352 MB** invece di 11.
+- **pybuild esegue la suite da una copia del solo pacchetto**, dove la
+  `.desktop` e le icone non ci sono, e quattro test di `test_packaging.py`
+  le cercano relativamente al repo. `override_dh_auto_test` li fa girare
+  nell'albero sorgente, come fa `make check`, invece di indebolirli.
+
+**Verifica.**
+
+```console
+$ make lint          # lintian -i --pedantic
+(nessuna segnalazione)
+
+$ dpkg-source -x ../mkchromecast_0.4.4.dsc /tmp/src
+$ cd /tmp/src && dpkg-buildpackage -us -uc -b
+Ran 114 tests ... OK
+dpkg-deb: generazione del pacchetto "mkchromecast" in "../mkchromecast_0.4.4_all.deb"
+
+$ md5sum <i due .deb> | awk '{print $1}' | uniq -c
+      2 8f177b149233dd7b01a88898e386d4e9
+```
+
+Il pacchetto ricostruito dal sorgente è **identico byte per byte** a quello
+costruito dall'albero di lavoro.
+
 ### #14 — Il supporto Sonos era pubblicizzato ma assente  ✅ `7b38c65d`
 
 **Sintomo.** README, man page, voce `.desktop` e descrizione del bundle macOS
@@ -1193,6 +1262,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #21 | Porta non configurabile dalla tray; default a 5001 | `1332d261` |
 | #22 | `TypeError` aprendo il cursore del volume | `b99716c8` |
 | #23 | Quit non usciva e faceva partire una ricerca | `c667a206` |
+| #24 | Pacchetto non distribuibile: manutentore, sorgente, licenze | `b46bb5da` |
 
 ---
 

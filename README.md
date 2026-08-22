@@ -346,12 +346,37 @@ doing something surprising.
 make check      # run the test suite
 make wheel      # dist/mkchromecast-X.Y.Z-py3-none-any.whl
 make deb        # dist/mkchromecast_X.Y.Z-1local1_all.deb
+make dist       # ../mkchromecast_X.Y.Z_all.deb, the distributable package
 make binary     # dist/mkchromecast, a single standalone executable
 make install    # install into the virtualenv
 make develop    # same, editable
 make run ARGS="--discover"
 make clean-build
 ```
+
+There are two `.deb` builds, and they install the same files.
+
+`make deb` uses `dpkg-deb` through
+[`packaging/build-deb.sh`](packaging/build-deb.sh) and needs nothing beyond
+`dpkg-dev`, so it works anywhere; use it to try a change on the installed
+copy. It writes to `dist/`, and its Debian revision is `1local1`.
+
+`make dist` is the one to hand to somebody else. It builds from the `debian/`
+directory with `dpkg-buildpackage`, which also produces a source package that
+anyone receiving it can rebuild, and it writes to the parent directory as
+every Debian tool expects. It needs `debhelper`, `dh-python` and
+`python3-all`; `make lint` additionally needs `lintian` and checks the result.
+
+```
+sudo apt install debhelper dh-python python3-all lintian
+make dist       # ../mkchromecast_X.Y.Z_all.deb, .dsc, .tar.xz, .changes
+make lint       # lintian -i --pedantic over what make dist built
+sudo apt install ../mkchromecast_X.Y.Z_all.deb
+```
+
+The source package leaves out `archive/` and `notifier/`, which are macOS-only
+and carry third-party code whose licence is stated by reference or not at all;
+[`debian/source/options`](debian/source/options) records why.
 
 `make binary` uses [PyInstaller](https://pyinstaller.org) (`pip install
 pyinstaller`) and produces one file, around 63 MB, that carries its own Python
