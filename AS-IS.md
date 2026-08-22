@@ -844,7 +844,7 @@ nuovi in `tests/test_pulseaudio.py`.
 
 **Trovato verificando l'installazione del `.deb`, non da un test.**
 
-### #17 — L'icona della tray non seguiva il tema scuro  ✅ `PENDING`
+### #17 — L'icona della tray non seguiva il tema scuro  ✅ `59a5b788`
 
 **Sintomo.** Con il desktop Ubuntu in tema scuro, l'icona nella barra
 superiore è quasi invisibile: è nera su fondo trasparente.
@@ -957,7 +957,7 @@ Il `README.md` cita ancora `python3.6` e `python3-pychromecast`
 | #14 | Sonos pubblicizzato ma assente | `7b38c65d` |
 | #15 | `getch` non impacchettato: `--control` rotto una volta installato | `f160fb52` |
 | #16 | `pactl` irraggiungibile: traceback invece di un messaggio | `e124d828` |
-| #17 | Icona della tray nera su tema scuro | vedi sotto |
+| #17 | Icona della tray nera su tema scuro | `59a5b788` |
 
 ---
 
