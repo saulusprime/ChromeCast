@@ -1,3 +1,30 @@
+* Mkchromecast (0.4.1), 2026-08-22 — fork saulusprime/ChromeCast
+
+    Two problems found by using the tray on the desktop, both documented in
+    `AS-IS.md` with symptom, cause, evidence collected and fix.
+
+    - Choosing a device no longer closes the application. When the streaming
+      port was already taken, the tray died about a second later and the
+      reason was left in the journal: the port check raised SystemExit from
+      inside a Qt worker slot, and PyQt aborts the process on anything that
+      escapes one. The attempt is now reported and the tray stays up.
+    - A failed attempt says what went wrong. The notification read "Streaming
+      Process Failed. Try Again...", which is bad advice when the answer is
+      that another program holds the port; the reason now travels with the
+      signal and is shown instead.
+    - The streaming port is a preference. The tray has no command line to take
+      one from, so a busy port could only be worked around by editing the
+      `.desktop` file. **Streaming Port** now sits in Preferences, and an
+      explicit `--port` still wins over it for that run.
+    - The default port moves from 5000 to 5001. 5000 is held by
+      `shairport-sync` on Linux and by AirPlay Receiver on macOS often enough
+      that the first cast of the day tended to land on somebody else's server.
+    - The node video backend honours `--port`. It served on a hardcoded 5000
+      while the device was told to read from the chosen port, the same defect
+      `webcast.js` had.
+    - "Reset Settings" works. It called a method on an attribute that does not
+      exist, so the button had never done anything but raise.
+
 * Mkchromecast (0.4.0), 2026-08-22 — fork saulusprime/ChromeCast
 
     Fixes found by running the code on Ubuntu 26.04 with Python 3.14,
