@@ -1,3 +1,22 @@
+* Mkchromecast (0.4.4), 2026-08-22 — fork saulusprime/ChromeCast
+
+    Packaging, so that the .deb can be handed to somebody else.
+
+    - There is a `debian/` directory, so the package builds with
+      `dpkg-buildpackage` and comes with a source package anyone who receives
+      it can rebuild. `make dist` builds it, `make lint` checks it; `make deb`
+      still builds the quick dpkg-deb package that needs no extra tools.
+    - The Maintainer field holds an address that works. It held an upstream
+      name with a URL where the address belongs, which came from `setup.py`
+      and is fixed there too.
+    - The copyright file follows DEP-5 and gives py-getch and the nodejs
+      streamer their own paragraphs.
+    - The source package leaves out `archive/` and `notifier/`. They are
+      macOS-only and neither is installed, but they carry third-party code
+      whose licence is stated only by reference, or -- for audiodevice, which
+      says "Copyright 2006 Rogue Amoeba Software, LLC. All rights reserved."
+      -- not at all.
+
 * Mkchromecast (0.4.3), 2026-08-22 — fork saulusprime/ChromeCast
 
     - Quit quits again. It raised AttributeError halfway through tearing the
